@@ -35,10 +35,22 @@
 \newlength{\energeseunit}
 \setlength{\energeseunit}{1.1cm}
 
-% One width for every pathway, whatever it carries and wherever it goes. An
-% edge may still override it per flow through the model's `volume' key.
+% One width for every flow between components, whatever it carries. An edge
+% may still override it per flow through the model's `volume' key.
 \newlength{\energeseflowwidth}
 \setlength{\energeseflowwidth}{0.9pt}
+
+% Odum draws three weights, not one, and they are measured, not chosen: across
+% modern-civilisation.png and pyramids-as-organisers.png (144 DPI, summed ink
+% across the stroke, good to about 0.3 px) a pathway is 2.4--2.6 px, a heat-sink
+% pathway 1.0--1.6 px and the system frame 3.6--4.3 px. Used energy is drawn
+% at about half a flow, so the dissipation reads as the fine tracery under the
+% working system that it is in his figures; the frame at about one and a half,
+% so the boundary reads as the boundary and not as one more pathway.
+\newlength{\energeseheatwidth}
+\setlength{\energeseheatwidth}{0.45pt}
+\newlength{\energeseframewidth}
+\setlength{\energeseframewidth}{1.35pt}
 
 % Labels sit inside the symbols, so they want to be smaller than body text.
 \newcommand{\energeselabelfont}{\sffamily\footnotesize}
@@ -72,10 +84,12 @@
     % sets its own bend and blows the arc up into a full circle.
     energese money_feedback/.style={->, dashed, black, line width=\energeseflowwidth},
     energese information/.style={->, solid, black, line width=\energeseflowwidth},
-    % Dissipation pathways carry the same weight as energy pathways.
-    % Dissipation pathways converge on a single ground, so they carry no head
-    % of their own -- one flow, one arrowhead, at the terminator.
-    energese heat/.style={-, solid, black, line width=\energeseflowwidth}
+    % Dissipation pathways are drawn at the heat-sink weight (see above), and
+    % converge on a single ground, so they carry no head of their own -- one
+    % flow, one arrowhead, at the terminator.
+    energese heat/.style={-, solid, black, line width=\energeseheatwidth},
+    % The system window.
+    energese frame/.style={draw, black, line width=\energeseframewidth}
 }
 
 %% -------------------------------------------------------------------------
@@ -135,6 +149,14 @@
     \global\advance\energese@portserial by 1\relax}
 
 \def\energeseportname{}
+
+% Which way round the ring a contested request steps: 1 anticlockwise, -1
+% clockwise, empty to let the allocator choose from where the other end lies.
+% The renderer sets it for the two legs of an exchange, whose money track must
+% take the port beside the goods on the same side at both ends -- left to
+% choose, the allocator steps up at one end and down at the other for a level
+% pair, and the tracks cross.
+\def\energeseportside{}
 
 \newcommand{\energesekeepport}[1]{%
     \expandafter\global\expandafter\let
@@ -202,6 +224,9 @@
         {(sin(\energese@portangt - \energese@portanga) < 0) ? -1 : 1}%
     \energese@portN=\energese@portNv\relax
     \energese@portS=\energese@portSv\relax
+    \ifx\energeseportside\@empty\else
+        \energese@portS=\energeseportside\relax
+    \fi
     \energese@portD=\energese@portDv\relax
     \energese@portwrap\energese@portD
     \energese@portJ=0

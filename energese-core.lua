@@ -2,12 +2,15 @@ local dkjson = require("dkjson")
 
 local energese = {}
 
--- Node types whose PGF shape declares a `heat_sink` anchor. Sources and
--- interactions have one but carry no dissipation in Odum's convention; `text`,
--- `box` and `ground` are plain TikZ shapes and have no such anchor at all, so
--- asking for one is a hard TeX error.
-energese.HAS_HEAT_SINK = {
-    producer = true, consumer = true, storage = true, transaction = true,
+-- Node types that dissipate, and so run a pathway to the ground. Every one has
+-- a `heat_sink` anchor; `text`, `box` and `ground` are plain TikZ shapes with no
+-- such anchor, and asking for one is a hard TeX error. Sources and interactions
+-- have the anchor but carry no dissipation in Odum's convention, and neither
+-- does the exchange diamond: it marks a transaction between two components and
+-- transforms nothing, so there is nothing for it to degrade. Drawing a heat
+-- sink on one made the diamond read as a component consuming what flowed in.
+energese.DISSIPATES = {
+    producer = true, consumer = true, storage = true,
     gain = true, loop_limited = true, switch = true,
 }
 
@@ -391,16 +394,6 @@ function energese.expand_exchanges(data)
     local added = {}
     for _, node in ipairs(data.nodes) do
         if node.seller and node.buyer then
-            -- The two sides of one transaction must read as a couple, so they
-            -- run tightly parallel with the money just outside the goods.
-            --
-            -- The bend directions are not a typo. `bend left' is relative to
-            -- direction of travel, and money runs opposite to goods, so
-            -- matching `bend left' on both would bow them to opposite sides and
-            -- open a lens between them. `bend right' on the return puts both
-            -- bows on the same side; the larger angle sets the gap.
-            local GOODS, MONEY = "bend left=8", "bend right=15"
-
             -- Goods run seller to buyer as ONE continuous pathway, and the
             -- diamond rides it as a marker at the midpoint, rotated to the
             -- flow. It is not a component the pathway enters: Odum draws the
@@ -410,13 +403,26 @@ function energese.expand_exchanges(data)
             -- and nothing to give it a transformity of its own.
             added[#added + 1] = {
                 from = node.seller, to = node.buyer, type = "energy",
-                label = node.energy_label, options = GOODS, exchange_leg = true,
+                label = node.energy_label, options = "bend left=8",
+                exchange = node.id, exchange_leg = "goods",
                 marker = node.type or "transaction",
                 marker_magnitude = node.magnitude or 0.62,
             }
+            -- Money is the goods' own track run backwards: the same anchors,
+            -- so it takes the port beside the goods at each end, on the left
+            -- of the goods' direction of travel (clockwise at the buyer,
+            -- anticlockwise at the seller); and the same geometry, mirrored
+            -- once the goods' route is settled. Given the money anchors and a
+            -- bend of its own, as it first was, it left the upper half of each
+            -- symbol on a separate arc and read as a second pathway that
+            -- happened to pass near the diamond, not as the other half of one
+            -- transaction.
             added[#added + 1] = {
                 from = node.buyer, to = node.seller, type = "money_feedback",
-                label = node.money_label, options = MONEY, exchange_leg = true,
+                label = node.money_label,
+                from_anchor = "energy_in", to_anchor = "energy_out",
+                port_side_from = -1, port_side_to = 1,
+                exchange = node.id, exchange_leg = "money",
             }
         end
     end
@@ -493,7 +499,7 @@ function energese.check_energetics(data)
     -- 4. Energy arriving somewhere must leave, as outflow or as dissipation.
     for _, node in ipairs(data.nodes) do
         if (in_degree[node.id] or 0) > 0 and (out_degree[node.id] or 0) == 0
-            and not energese.HAS_HEAT_SINK[node.type]
+            and not energese.DISSIPATES[node.type]
             and node.type ~= "text" and node.type ~= "box"
             and node.type ~= "ground" and not (node.seller and node.buyer) then
             report("'%s' receives energy but neither passes it on nor "
@@ -1895,6 +1901,42 @@ function energese.place_edge_labels(edges, geom, boxes, x_coords, y_coords,
         end
     end
 
+    -- An exchange's diamond is not a symbol pathways avoid, but a quantity
+    -- written over it hides it, so it is kept clear like one. Its size is the
+    -- transaction's bare extent at the marker's magnitude.
+    local markers = {}
+    for i, edge in ipairs(edges) do
+        if edge.marker and curves[i] then
+            local mx, my = point_at(curves[i].samples, curves[i].points, 0.5)
+            local hw, hh = energese.half_extent({ type = edge.marker,
+                magnitude = edge.marker_magnitude })
+            markers[#markers + 1] = { id = "marker" .. i, x = mx, y = my, hw = hw,
+                                      hh = hh + 0.15 }
+        end
+    end
+    local obstacles = boxes
+    if #markers > 0 then
+        obstacles = {}
+        for _, b in ipairs(boxes) do obstacles[#obstacles + 1] = b end
+        for _, b in ipairs(markers) do obstacles[#obstacles + 1] = b end
+    end
+
+    -- Each side of an exchange is captioned on its own outside: the money
+    -- runs on the left of the goods' direction of travel, so the goods'
+    -- caption belongs on their right and the money's on its left -- below and
+    -- above, for goods running left to right. Either side is still taken if
+    -- the preferred one is blocked.
+    local prefer = {}
+    for i, edge in ipairs(edges) do
+        if edge.exchange_leg and curves[i] then
+            -- The same rule for both legs, in each leg's own direction: a
+            -- pathway travelling rightwards has its right-hand side below.
+            -- The money travels the other way, so it lands on the other side.
+            local pts = curves[i].points
+            prefer[i] = (pts[#pts][1] >= pts[1][1]) and "below" or "above"
+        end
+    end
+
     local placed, out = {}, {}
     for i, edge in ipairs(edges) do
         -- An author who has written label_options has placed the label.
@@ -1921,7 +1963,7 @@ function energese.place_edge_labels(edges, geom, boxes, x_coords, y_coords,
                         -- the symbols it runs between is just as lost as one
                         -- written across a third.
                         local score = energese.label_conflicts(px, cy, hw, hh,
-                            nil, boxes, segments)
+                            nil, obstacles, segments)
                         -- Two labels on top of each other are worse than
                         -- either on a pathway, and as bad as one on a symbol.
                         for _, other in ipairs(placed) do
@@ -1935,7 +1977,7 @@ function energese.place_edge_labels(edges, geom, boxes, x_coords, y_coords,
                         -- label that moves without cause is a label the reader
                         -- has to hunt for.
                         score = score * 100 + (pi - 1) * 3 + (li - 1) * 2
-                                + ((side == "above") and 0 or 1)
+                                + ((side == (prefer[i] or "above")) and 0 or 1)
                         if not best_score or score < best_score then
                             best_score = score
                             best = { pos = pos, side = side, lift = lift,
@@ -2023,8 +2065,10 @@ function energese.port_requests(edges, node_map, x_coords, y_coords)
     for i, edge in ipairs(edges) do
         local from_anchor, to_anchor = energese.edge_anchors(edge, node_map)
         for _, req in ipairs({
-            { node = edge.from, anchor = from_anchor, other = edge.to,   key = "e" .. i .. "f" },
-            { node = edge.to,   anchor = to_anchor,   other = edge.from, key = "e" .. i .. "t" },
+            { node = edge.from, anchor = from_anchor, other = edge.to,
+              key = "e" .. i .. "f", side = edge.port_side_from },
+            { node = edge.to,   anchor = to_anchor,   other = edge.from,
+              key = "e" .. i .. "t", side = edge.port_side_to },
         }) do
             local dx = (x_coords[req.other] or 0) - (x_coords[req.node] or 0)
             local dy = (y_coords[req.other] or 0) - (y_coords[req.node] or 0)
@@ -2223,11 +2267,9 @@ function energese.render(data, options)
     local sinks = {}
     if not data.metadata or data.metadata.show_heat_sink ~= false then
         for _, node in ipairs(data.nodes) do
-            -- An exchange marker annotates a coupling; it transforms nothing
-            -- and so dissipates nothing, even though its glyph is a shape that
-            -- otherwise would.
-            if energese.HAS_HEAT_SINK[node.type]
-                and not (node.seller and node.buyer) then
+            -- See DISSIPATES: a transaction, standalone or an exchange's
+            -- marker, transforms nothing and dissipates nothing.
+            if energese.DISSIPATES[node.type] then
                 sinks[#sinks + 1] = node.id
             end
         end
@@ -2349,14 +2391,17 @@ function energese.render(data, options)
     for _, req in ipairs(energese.port_requests(data.edges, node_map,
                                                 x_coords, y_coords)) do
         tex.print(string.format(
-            "\\energeseport{%s}{%s}{%s}\\energesekeepport{%s}",
+            "\\def\\energeseportside{%s}"
+            .. "\\energeseport{%s}{%s}{%s}\\energesekeepport{%s}"
+            .. "\\def\\energeseportside{}",
+            req.side and tostring(req.side) or "",
             req.node, req.anchor, req.other, req.key))
     end
 
     -- Pathway geometry, settled for every edge before any is drawn. The
     -- labels are placed against it below, and a label can only be kept clear
     -- of the pathways if the pathways are all known first.
-    local geom = {}
+    local geom, goods_geom = {}, {}
     for edge_index, edge in ipairs(data.edges) do
         local from, to = edge.from, edge.to
         local options = edge.options or ""
@@ -2366,7 +2411,8 @@ function energese.render(data, options)
         -- Only supply it when the edge has not routed itself: two routings
         -- fight each other and the arc balloons into a circle.
         local ROUTE = "out=90, in=90, looseness=1.2"
-        if edge.type == "money_feedback" and not options:match("bend")
+        if edge.type == "money_feedback" and not edge.exchange_leg
+            and not options:match("bend")
             and not options:match("out%s*=") and not options:match("in%s*=") then
             options = options ~= "" and (options .. ", " .. ROUTE) or ROUTE
         end
@@ -2404,6 +2450,23 @@ function energese.render(data, options)
         end
 
         geom[edge_index] = { options = options, waypoints = waypoints }
+        if edge.exchange_leg == "goods" then goods_geom[edge.exchange] = geom[edge_index] end
+    end
+
+    -- An exchange's money track mirrors the goods' settled route, so the two
+    -- stay a port apart all the way: the same bend seen from the other end
+    -- (left becomes right), or the same waypoints in reverse.
+    for edge_index, edge in ipairs(data.edges) do
+        local g = edge.exchange_leg == "money" and goods_geom[edge.exchange]
+        if g then
+            local reversed = {}
+            for k = #g.waypoints, 1, -1 do reversed[#reversed + 1] = g.waypoints[k] end
+            local mirrored = g.options:gsub("bend (%a+)", function(side)
+                if side == "left" then return "bend right" end
+                if side == "right" then return "bend left" end
+            end)
+            geom[edge_index] = { options = mirrored, waypoints = reversed }
+        end
     end
 
     -- The dissipation bundle, computed. Every dissipating component runs a
@@ -2507,12 +2570,15 @@ function energese.render(data, options)
 
         -- An exchange marker rides the pathway rather than terminating it:
         -- placed at the midpoint, rotated to the flow, and unfilled so the
-        -- pathway runs visibly through it.
+        -- pathway runs visibly through it. It sits half a port pitch towards
+        -- the money track, between the two, so that both run through the
+        -- diamond -- goods through its lower half, money its upper -- as on
+        -- Odum's symbol sheet.
         local marker_code = ""
         if edge.marker then
             marker_code = string.format(
                 "node[energese %s, energese magnitude=%f, pos=0.5, sloped, "
-                .. "fill=none, inner sep=0pt] {}",
+                .. "yshift=0.5\\energeseanchorpitch, fill=none, inner sep=0pt] {}",
                 edge.marker, edge.marker_magnitude or 1.0)
         end
 
@@ -2554,7 +2620,10 @@ function energese.render(data, options)
     -- before the heat sinks, so the dissipation pathways cross it as they do
     -- in Odum's originals.
     for _, sb in ipairs(windows) do
-        local style = sb.style or "thick"
+        -- The model's `style` refines the frame rather than replacing it,
+        -- so a dashed sub-system boundary keeps the boundary's weight.
+        local style = "energese frame"
+        if sb.style and sb.style ~= "" then style = style .. ", " .. sb.style end
         tex.print(string.format("\\draw[%s] (%f, %f) rectangle (%f, %f);",
             style, sb.x_min, sb.y_min, sb.x_max, sb.y_max))
         if sb.label then
