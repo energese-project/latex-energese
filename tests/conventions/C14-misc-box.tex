@@ -1,0 +1,16 @@
+% C14: the miscellaneous box -- input left, second input above, output right, heat sink below.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=3.2, row_spacing=1.6}
+    \esnode{a}{source} {Tr=1,   label={A}}
+    \esnode{b}{source} {Tr=50,  label={B}}
+    \esnode{m}{misc}   {Tr=100, label={Industry}}
+    \esnode{q}{storage}{Tr=500, label={Q}}
+    \esflow{a}{m}{energy}
+    \esflow{b}{m}{energy}
+    \esflow{m}{q}{energy}
+\end{energese}
+\end{document}

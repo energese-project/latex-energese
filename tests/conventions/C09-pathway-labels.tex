@@ -1,0 +1,12 @@
+% C09: a pathway named on one side and quantified on the other.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=3.8, row_spacing=1.5, show_heat_sink=false}
+    \esnode{src}{source}{Tr=1,  label={}}
+    \esnode{q}{storage} {Tr=10, label={$Q$\\100 g}}
+    \esflow{src}{q}{energy}{label={$J_0$}, quantity={2 g/Day}}
+\end{energese}
+\end{document}

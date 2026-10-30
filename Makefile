@@ -27,7 +27,7 @@ ARTICLE := docs/article
 PARITY := simple_system source-store aggregated-economy
 
 .PHONY: all examples docs test parity render regression regression-accept \
-        conformance sheet compare overlay fonts fidelity article check clean
+        conformance conventions sheet compare overlay fonts fidelity article check clean
 
 all: examples docs
 
@@ -88,6 +88,11 @@ regression-accept:
 
 conformance: render
 	@$(FIDELITY) conformance
+
+# Each item of docs/odum-conventions.md rendered beside the crop of Odum's
+# figure it was taken from: tests/fidelity/out/conventions-sheet.png.
+conventions: render
+	@$(FIDELITY) conventions
 
 sheet: render
 	@$(FIDELITY) sheet

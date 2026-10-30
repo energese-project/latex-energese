@@ -1,0 +1,15 @@
+% C08: feedback from a higher-transformity component arcs over into the receiver's top.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=3.4, row_spacing=1.6}
+    \esnode{fuel}{source} {Tr=1,    label={Fuels}}
+    \esnode{ind}{misc}    {Tr=100,  label={Industry}}
+    \esnode{sky}{storage} {Tr=2000, label={Highways,\\Dams}}
+    \esflow{fuel}{ind}{energy}
+    \esflow{ind}{sky}{energy}
+    \esflow{sky}{ind}{feedback}
+\end{energese}
+\end{document}

@@ -1,0 +1,15 @@
+% C10: the frame caption below the bottom-left corner; the heat total beside the ground.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=3.4, row_spacing=1.5, heat_sink_label={11,297.6}}
+    \esboundary{x_min=1.6, x_max=11.8, y_min=-2.6, y_max=1.4, label={$10^{15}$ Calories per Year}}
+    \esnode{sun}{source}   {Tr=1,   label={Sun}}
+    \esnode{farm}{producer}{Tr=10,  label={Agriculture}}
+    \esnode{pop}{consumer} {Tr=100, label={Population}}
+    \esflow{sun}{farm}{energy}
+    \esflow{farm}{pop}{energy}
+\end{energese}
+\end{document}

@@ -893,22 +893,28 @@
 %% -------------------------------------------------------------------------
 %% Ground -- the heat-sink terminator. A fixed-size glyph, never labelled.
 %% -------------------------------------------------------------------------
+% Three bars, each shorter than the one above, with nothing above the top bar:
+% the pathway's own arrowhead rests on it (the `energese ground arrow' tip in
+% energese.sty). Measured from the ground in strong-source.png, whose pathways
+% are about the package's weight, so the figure is near enough 1:1 -- bars of
+% 38, 27 and 13 px at 144 DPI (6.7, 4.8, 2.3 mm), 6 px (1.1 mm) apart, under an
+% arrowhead 22 px wide and 18 px tall (3.9 by 3.2 mm). Good to about 1 px.
+% An earlier glyph carried a stub above a 4 mm bar, under a 1.5 mm arrowhead
+% that stopped short of it, so the pathway appeared to end twice.
 \pgfdeclareshape{energese ground}{
     \savedanchor\centerpoint{\pgfpointorigin}
     \anchor{center}{\centerpoint}
     \anchor{north}{\pgfpoint{0pt}{0pt}}
-    \anchor{south}{\pgfpoint{0pt}{-0.3cm}}
-    \anchor{east}{\pgfpoint{0.2cm}{-0.1cm}}
-    \anchor{west}{\pgfpoint{-0.2cm}{-0.1cm}}
+    \anchor{south}{\pgfpoint{0pt}{-0.22cm}}
+    \anchor{east}{\pgfpoint{0.335cm}{0pt}}
+    \anchor{west}{\pgfpoint{-0.335cm}{0pt}}
     \backgroundpath{
-        \pgfpathmoveto{\pgfpoint{0pt}{0pt}}
-        \pgfpathlineto{\pgfpoint{0pt}{-0.1cm}}
-        \pgfpathmoveto{\pgfpoint{-0.2cm}{-0.1cm}}
-        \pgfpathlineto{\pgfpoint{0.2cm}{-0.1cm}}
-        \pgfpathmoveto{\pgfpoint{-0.1cm}{-0.17cm}}
-        \pgfpathlineto{\pgfpoint{0.1cm}{-0.17cm}}
-        \pgfpathmoveto{\pgfpoint{-0.05cm}{-0.24cm}}
-        \pgfpathlineto{\pgfpoint{0.05cm}{-0.24cm}}
+        \pgfpathmoveto{\pgfpoint{-0.335cm}{0pt}}
+        \pgfpathlineto{\pgfpoint{0.335cm}{0pt}}
+        \pgfpathmoveto{\pgfpoint{-0.24cm}{-0.11cm}}
+        \pgfpathlineto{\pgfpoint{0.24cm}{-0.11cm}}
+        \pgfpathmoveto{\pgfpoint{-0.115cm}{-0.22cm}}
+        \pgfpathlineto{\pgfpoint{0.115cm}{-0.22cm}}
         \pgfusepath{draw}
     }
 }

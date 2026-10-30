@@ -1,0 +1,12 @@
+% C13: the ground -- one large filled arrowhead resting on the top bar.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=3.0, row_spacing=1.5}
+    \esnode{src}{source}{Tr=1,  label={}}
+    \esnode{q}{storage} {Tr=10, label={Q}}
+    \esflow{src}{q}{energy}
+\end{energese}
+\end{document}

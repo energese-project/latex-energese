@@ -610,7 +610,7 @@ Implemented so far:
 | `producer` | Rectangle closed by a semicircle on the **right** | yes |
 | `consumer` | Hexagon, pointed **top and bottom** | yes |
 | `transaction` | Diamond (Odum's "exchange") | no |
-| `interaction` | Pointed right, notched left | no |
+| `interaction` | Pointed right, notched left | yes |
 | `gain` | Right-pointing triangle (constant-gain amplifier) | yes |
 | `loop_limited` | Rectangle whose right side bows outward | yes |
 | `switch` | Square with all four sides bowed inward | yes |
@@ -618,9 +618,12 @@ Implemented so far:
 | `text` | Unboxed label; routing waypoint | no |
 | `ground` | Fixed-size heat-sink terminator glyph | n/a |
 
-Sources, interactions and transactions carry no heat sink by Odum's
-convention — the exchange diamond marks a transaction between two components
-and transforms nothing, so it has nothing to dissipate. `text`, `box` and
+Sources and transactions carry no heat sink by Odum's convention — the exchange
+diamond marks a transaction between two components and transforms nothing, so
+it has nothing to dissipate. The interaction *does* dissipate: the symbol sheet
+draws its heat sink, and `strong-source.png` runs used energy down from the
+work transformation. (This file used to say otherwise; see
+`docs/odum-conventions.md` C12.) `text`, `box` and
 `ground` are plain TikZ shapes with no `heat_sink` anchor at all — asking for
 one is a hard TeX error. `energese.DISSIPATES` is the set that does dissipate.
 

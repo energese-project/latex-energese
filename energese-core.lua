@@ -4,13 +4,13 @@ local energese = {}
 
 -- Node types that dissipate, and so run a pathway to the ground. Every one has
 -- a `heat_sink` anchor; `text`, `box` and `ground` are plain TikZ shapes with no
--- such anchor, and asking for one is a hard TeX error. Sources and interactions
--- have the anchor but carry no dissipation in Odum's convention, and neither
--- does the exchange diamond: it marks a transaction between two components and
+-- such anchor, and asking for one is a hard TeX error. A source has the anchor
+-- but carries no dissipation in Odum's convention, and neither does the
+-- exchange diamond: it marks a transaction between two components and
 -- transforms nothing, so there is nothing for it to degrade. Drawing a heat
 -- sink on one made the diamond read as a component consuming what flowed in.
 energese.DISSIPATES = {
-    producer = true, consumer = true, storage = true,
+    producer = true, consumer = true, storage = true, interaction = true,
     gain = true, loop_limited = true, switch = true,
 }
 
@@ -2626,9 +2626,14 @@ function energese.render(data, options)
         if sb.style and sb.style ~= "" then style = style .. ", " .. sb.style end
         tex.print(string.format("\\draw[%s] (%f, %f) rectangle (%f, %f);",
             style, sb.x_min, sb.y_min, sb.x_max, sb.y_max))
+        -- The caption -- usually the units the diagram's quantities are in --
+        -- goes outside, under the bottom-left corner, where Odum writes
+        -- "10^15 Calories per Year". Inside the top-left corner it read as a
+        -- component's name and sat in the way of the sources' pathways.
         if sb.label then
-            tex.print(string.format("\\node[anchor=north west, font=\\sffamily] at (%f, %f) {%s};",
-                sb.x_min, sb.y_max, sb.label))
+            tex.print(string.format("\\node[anchor=north west, font=\\sffamily, "
+                .. "inner xsep=0pt] at (%f, %f) {%s};",
+                sb.x_min, sb.y_min - 0.12, sb.label))
         end
     end
 
@@ -2643,17 +2648,21 @@ function energese.render(data, options)
 
         -- One line from the collection point out through the frame, and
         -- the single arrowhead for the whole dissipation bundle.
+        -- The arrowhead's tip is the ground's top bar: one ending, not an
+        -- arrow stopping short of a separate glyph.
         tex.print(string.format(
-            "\\draw[energese heat, ->] (%f, %f) -- (%f, %f);",
-            bundle.ground_x, bundle.collect_y, bundle.ground_x, bundle.ground_y - 0.28))
+            "\\draw[energese ground arrow] (%f, %f) -- (%f, %f);",
+            bundle.ground_x, bundle.collect_y, bundle.ground_x, bundle.ground_y - 0.30))
         tex.print(string.format("\\node[energese ground] at (%f, %f) {};",
             bundle.ground_x, bundle.ground_y - 0.30))
 
+        -- The total sits beside the arrowhead, clear of the top bar, as
+        -- Odum writes "11,297.6" level with the head.
         local hs_label = data.metadata and data.metadata.heat_sink_label
         if hs_label then
             tex.print(string.format(
                 "\\node[anchor=west, font=\\sffamily] at (%f, %f) {%s};",
-                bundle.ground_x + 0.30, bundle.ground_y - 0.42, hs_label))
+                bundle.ground_x + 0.40, bundle.ground_y - 0.16, hs_label))
         end
     end
 

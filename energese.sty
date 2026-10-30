@@ -88,6 +88,10 @@
     % converge on a single ground, so they carry no head of their own -- one
     % flow, one arrowhead, at the terminator.
     energese heat/.style={-, solid, black, line width=\energeseheatwidth},
+    % The single arrowhead of the dissipation bundle, resting on the ground's
+    % top bar: Odum's is large and filled, 3.9 by 3.2 mm (energese-shapes.tex).
+    energese ground arrow/.style={-{Triangle[length=3.2mm, width=3.9mm]},
+        solid, black, line width=\energeseheatwidth},
     % The system window.
     energese frame/.style={draw, black, line width=\energeseframewidth}
 }
