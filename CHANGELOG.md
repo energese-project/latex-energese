@@ -11,6 +11,48 @@ Each release is archived on Zenodo. The concept DOI
 [10.5281/zenodo.22340275](https://doi.org/10.5281/zenodo.22340275) resolves to
 the latest; version DOIs are listed in the record's *Versions* box.
 
+## [Unreleased]
+
+**Rendered output changes** for any diagram drawn with `scale`, and for most
+diagrams with labelled symbols: symbols are spaced, framed and routed around
+at their real size.
+
+### Fixed
+
+- **`scale` no longer overlaps the symbols.** TikZ's `scale` moved the
+  coordinates but drew the symbols at full size, so a scaled diagram packed
+  full-size symbols into a shrunken layout; the user guide's figures, at 0.75
+  and 0.42, overlapped throughout. A scaled picture now gets `transform shape`
+  and shrinks as one, labels included.
+- **Symbol extents match what TeX draws.** The size the layout assumes for a
+  symbol understated labelled ones by up to 86% in height and 45% in width, so
+  an exchange diamond was drawn over the consumer it was attached to and
+  system windows crowded two-line labels. The estimate now reproduces each
+  shape's sizing rule, with character widths measured from the label font.
+- **Heat-sink pathways nest and no longer cross.** Their lanes were measured
+  from each symbol, so a far component in a higher row turned in above a nearer
+  one and cut across it; the curve's downward handle was sized from the whole
+  chord, so far tributaries sagged under the junction and climbed back. Lanes
+  are now absolute depths, ordered by reach on each side of the trunk, and the
+  handle is bounded by the drop.
+- A label is now kept off the vertical drop of a heat-sink pathway, which the
+  placement did not see.
+- A label that fits its symbol is no longer pushed outside it because its
+  width was over-read (`source-store`'s equation now sits in its box, as
+  in Odum's figure).
+
+### Changed
+
+- A system window given explicit coordinates that is too shallow for the
+  dissipation funnel is deepened, with a warning giving the new `y_min`.
+- `xscale` and `yscale` on a diagram are an error: they would distort Odum's
+  symbols. Use `scale`, or `\energeseunit` and the spacing.
+
+### Added
+
+- `tests/unit/test_extents.tex` asserts the estimated extent of every shape
+  against TeX's own bounding box.
+
 ## [0.1.0] — 2026-09-06
 
 DOI: [10.5281/zenodo.22466673](https://doi.org/10.5281/zenodo.22466673)

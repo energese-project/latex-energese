@@ -102,8 +102,8 @@ departure and arrival directions, so it tests what the curve actually crosses
 rather than the straight line between endpoints.
 
 Obstacle extents are *estimated* — from `\energeseunit`, the shape's
-proportions and a per-character label estimate — because Lua does not know what
-TeX will typeset. `energese.half_extent` is the one definition of that estimate,
+sizing rule and the label font's measured glyph widths — because Lua does not
+know what TeX will typeset. `energese.half_extent` is the one definition of that estimate,
 and everything that needs a symbol's size goes through it: a symbol that is one
 size to the router and another to the layout would be routed around a box it
 does not fill. `energese.UNIT_CM` must track `\energeseunit`. A node whose
@@ -111,15 +111,31 @@ estimate is wrong can override it with `clearance_w` / `clearance_h`. Measuring
 extents exactly would mean round-tripping them through the `.aux` file, which is
 the obvious next step if the estimate proves too coarse.
 
-The label term is the label's width **divided by the fraction of the outline
-that shape lets its text occupy** (`TEXT_FRACTION`, the `fx` each shape passes
-to `\energese@fit`). A labelled symbol is wider than its label by exactly that
-factor, and taking the label's own width as the symbol's understated a labelled
-exchange diamond by half.
+**The estimate reproduces `\energese@fit`; it does not approximate it.** Each
+fitted shape's outline is `outh = max(minimum, dimx/(fx·R), dimy/fy)`,
+`outw = R·outh`, with the label's half-dimensions plus the node's inner sep as
+`dimx`/`dimy` and the shape's own `R`, `fx`, `fy` (`FIT` in the Lua, copied
+from the arguments each shape passes to `\energese@fit`); source and storage
+are their circle fits. Every shortcut tried here understated labelled symbols
+badly, and the overlaps they caused in the user guide were what exposed them:
+the label's width alone ignored `dimy/fy`, which is what sizes a short label in
+a flat shape (a diamond labelled "Sun" is 1.0 cm wide, not 0.6); growing the
+width but not the height left a labelled gain at a seventh of its real height;
+and one average character width over-read lowercase by a quarter and under-read
+capitals. Character widths are a table measured from the label font
+(`CHAR_CM`), and `OUTLINE_SPAN` covers the two shapes whose drawn outline
+reaches past the dimensions they are sized by.
+
+`tests/unit/test_extents.tex` typesets every shape with a range of labels and
+asserts the estimate stays within 0.95–1.15 of TeX's bounding box. Change a
+shape's sizing, its minimum size, the label font or `\energeseunit` without
+updating the estimate and that test fails, rather than a diagram overlapping.
 
 **The estimate is a floor, not a target.** Over-estimating spaces symbols
 further apart and routes pathways wider; under-estimating draws a pathway
-through a symbol. Anything that searches against these numbers — the label
+through a symbol. `ESTIMATE_MARGIN` widens the reproduced fit by the most it
+was measured short (kerning, mitred corners), so the worst case sits on the
+outline. Anything that searches against these numbers — the label
 placement especially — will happily take a position whose entire clearance is
 estimation error, so it scores against a box slightly larger than the estimate.
 
@@ -238,6 +254,33 @@ nearer one all the way to the junction they share. Routing each one
 independently, which is what this replaced, brought them into the junction from
 all directions and they crossed on the way; dissipation pathways that cross read
 as pathways meeting where nothing joins.
+
+**The lane is an absolute depth.** Measured from each symbol's own underside,
+lanes only nested when the components shared a row: a component two rows up
+turned in two rows higher whatever its reach, ran above the nearer tributary,
+cut under that one's symbol and was routed round it below the junction, crossing
+it twice. `energese.dissipation_turns` takes each side of the trunk in order of
+reach and turns each tributary in at its own drop or one lane below the nearer
+one, whichever is lower; the two sides never meet, so they nest independently.
+The junction sits a full drop below the deepest turn, so the tributaries meet it
+at an angle instead of running together for their last stretch.
+
+**The tributary's handle is bounded by its drop.** It leaves its turn straight
+down, and TikZ sizes an `out=-90` handle at a third of the chord — two units for
+a tributary five units out and a quarter of a unit above the junction, so the
+curve sagged under the junction and climbed back in. `heat_controls` caps the
+downward handle at the drop, which puts every control point at or above the
+junction; a cubic stays in the hull of its control points. The drawing and the
+label placement both use it, so the curve labels keep off is the one drawn.
+
+**A window too shallow for the funnel is deepened, and says so.** The funnel
+converges inside the window, so the window must reach a full drop and the
+junction's rise below the deepest turn. A hand-drawn frame that does not had
+every lane under its floor clamped to one height — the tributaries ran along
+the bottom of the frame and across each other. The floor is lowered instead,
+with a warning naming the new height: it encloses nothing new, only empty
+space, and it is the same choice already made for a `heat_sink_y` that would
+put the ground inside the frame.
 
 Two ways of expressing that lane are wrong, and both were tried:
 
@@ -678,6 +721,16 @@ at 240 degrees instead of 270 and dissipation left the corner of the symbol.
 Taking the count as the *ratio* of the two offsets cancels the transformation.
 Every golden happened to be drawn unscaled, which is why nothing caught it and
 why `diagram-scaled` now exists; the paper's own figures are drawn at 0.85.
+
+**A scaled diagram scales as one picture.** The layout is computed in diagram
+units for symbols at their full size, so TikZ's `scale` alone — which moves
+coordinates and leaves nodes as they are — draws full-size symbols on a shrunken
+layout. At the user guide's `scale=0.42` every symbol was 2.4 times too big for
+its room: they overlapped, and pathways routed clear of them ran through them.
+`energese.picture_options` therefore adds `transform shape` whenever the
+picture is scaled, so labels shrink too, and refuses `xscale`/`yscale`, which
+would distort the symbols or break the layout. To shrink the symbols but not
+the type, set `\energeseunit` and the spacing instead.
 
 Each shape supplies a radius-at-angle macro, and every one of them is exact or
 converged. The switch's bowed side is solved rather than approximated: in the

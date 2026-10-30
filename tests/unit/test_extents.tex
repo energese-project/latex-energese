@@ -1,0 +1,88 @@
+% Extents: the size the layout engine assumes for a symbol, against the size
+% TeX actually draws it.
+%
+% Everything that keeps symbols apart -- the router's obstacles, the gap an
+% attached modifier keeps from its parent, the system window's margin, where a
+% label may go -- works from `energese.half_extent`, an estimate made in Lua
+% before TeX has typeset anything. When that estimate fell behind the shapes'
+% own sizing rule the diagrams overlapped: a labelled exchange diamond was
+% understated by 40% and its height by two thirds, and it was drawn on top of
+% the consumer it was attached to. This typesets every shape with a range of
+% labels, measures its bounding box, and fails if the estimate strays outside
+% the band the per-character label width can justify.
+%
+% It also pins what `scale` does to a picture, since a diagram scaled without
+% its symbols is the other way the layout and the drawing come apart.
+\documentclass{article}
+\usepackage{energese}
+\usepackage{luacode}
+
+\makeatletter
+\newcommand\checkextent[2]{%
+    \setbox0=\hbox{\begin{tikzpicture}\node[energese #1] {#2};\end{tikzpicture}}%
+    \directlua{energese_test.check("#1", [==[\detokenize{#2}]==],
+        \strip@pt\dimexpr\wd0/2\relax, \strip@pt\dimexpr(\ht0+\dp0)/2\relax)}%
+}
+\makeatother
+
+\begin{document}
+
+\begin{luacode*}
+    energese_test = { worst_low = math.huge, worst_high = 0 }
+    -- The band. The estimate is a floor: built from the shapes' own sizing
+    -- rule and the font's measured glyph widths, then widened by a fixed
+    -- margin, it lands within 0.97--1.13 of what TeX draws. Below 0.95 a
+    -- pathway can graze the symbol; above 1.15 symbols are being pushed apart
+    -- for nothing. Either way the shapes or the font have drifted from what
+    -- the estimate was built against.
+    local LOW, HIGH = 0.95, 1.15
+    local PT_PER_CM = 28.4527
+    function energese_test.check(shape, label, wpt, hpt)
+        label = label:gsub("\\\\ ?", "\\\\")
+        local rw, rh = wpt / PT_PER_CM, hpt / PT_PER_CM
+        local hw, hh = energese.half_extent({ type = shape, label = label })
+        for _, pair in ipairs({ { "width", hw / rw }, { "height", hh / rh } }) do
+            local what, ratio = pair[1], pair[2]
+            energese_test.worst_low = math.min(energese_test.worst_low, ratio)
+            energese_test.worst_high = math.max(energese_test.worst_high, ratio)
+            if ratio < LOW or ratio > HIGH then
+                tex.error(string.format("Extent FAILED: %s '%s' %s estimated at "
+                    .. "%.2f of what TeX draws", shape, label, what, ratio))
+            end
+        end
+    end
+\end{luacode*}
+
+\foreach \shape in {source,storage,producer,consumer,transaction,interaction,
+                    gain,loop_limited,switch}{%
+    \checkextent{\shape}{}\checkextent{\shape}{Sun}\checkextent{\shape}{Q}%
+    \checkextent{\shape}{Market}\checkextent{\shape}{Industry}%
+    \checkextent{\shape}{Agriculture}\checkextent{\shape}{Grass Biomass}%
+    \checkextent{\shape}{Environmental\\Systems}%
+    \checkextent{\shape}{Consumer\\Human Service}%
+}
+
+\begin{luacode*}
+    texio.write_nl(string.format("v Test 1 PASSED: every estimate within "
+        .. "%.2f--%.2f of TeX's bounding box", energese_test.worst_low,
+        energese_test.worst_high))
+
+    -- 2. A scaled picture scales its symbols too: the layout is one rigid
+    --    drawing, and coordinates shrinking under full-size nodes overlap them.
+    local opts = energese.picture_options("scale=0.5")
+    assert(opts:find("transform shape"),
+           "Test 2 FAILED: a scaled picture left its symbols at full size")
+    assert(energese.picture_options("scale = 0.5, transform shape")
+               == "scale = 0.5, transform shape",
+           "Test 2 FAILED: transform shape was added a second time")
+    assert(energese.picture_options("baseline=(current bounding box.center)")
+               == "baseline=(current bounding box.center)",
+           "Test 2 FAILED: options without a scale were changed")
+    assert(energese.picture_options("") == "",
+           "Test 2 FAILED: empty options were changed")
+    texio.write_nl("v Test 2 PASSED: a scale takes the symbols with it")
+\end{luacode*}
+
+All extent tests passed.
+
+\end{document}

@@ -534,38 +534,118 @@ local HALF_EXTENT = {
 -- Estimated height of a displaced label, in diagram units.
 local LABEL_HEIGHT = 0.30
 
--- Rough width of a label character, in cm. Calibrated for \energeselabelfont
--- (\sffamily\footnotesize); change it with that font. Used to decide whether a
--- label fits its cell and to size the obstacle a displaced one presents, so an
--- over-estimate is the safe direction.
+-- Width of each character of \energeselabelfont (\sffamily\footnotesize, TeX
+-- Gyre Heros Cn), in cm, as TeX sets it -- measured glyph by glyph, not
+-- guessed. A single average width, 0.14 cm, was what this used: it over-read
+-- lowercase text by a quarter, which made "Environmental Systems" a fifth
+-- wider than drawn and pushed labels off positions that were in fact clear,
+-- and it under-read capitals, so a lone "Q" was too small. Kerning is ignored;
+-- it moves a word by a few hundredths of a centimetre. Change the table with
+-- the font. Anything outside it -- markup, non-ASCII -- reads at CM_PER_CHAR.
 local CM_PER_CHAR = 0.14
+local CHAR_CM = {}
+for _, row in ipairs({
+    { 0.051, "'`ijl" },
+    { 0.060, "|" },
+    { 0.064, " !,./:;I[\\]ft" },
+    { 0.077, "\"()-r{}" },
+    { 0.090, "*" },
+    { 0.108, "^" },
+    { 0.115, "Jcksvxyz" },
+    { 0.128, "#$0123456789?L_abdeghnopqu" },
+    { 0.135, "+<=>~" },
+    { 0.141, "FTZ" },
+    { 0.154, "&ABEKPSVXY" },
+    { 0.166, "CDHNRUw" },
+    { 0.179, "GOQ" },
+    { 0.192, "Mm" },
+    { 0.205, "%" },
+    { 0.218, "W" },
+    { 0.234, "@" },
+}) do
+    for ch in row[2]:gmatch(".") do CHAR_CM[ch] = row[1] end
+end
 
--- What fraction of a symbol's width its label may occupy -- the `fx` each
--- shape declares to \energese@fit in energese-shapes.tex, and the reason a
--- labelled symbol is wider than its label. \energese@fit sets the outline
--- width to label-width / fx, so dividing here reproduces exactly what TeX will
--- do. Taking the label's own width as the symbol's, as this did, understated
--- a labelled exchange diamond by a factor of two, and the diamond attached to
--- a consumer overlapped it.
+-- How each shape fits its outline to its label: the arguments it passes to
+-- \energese@fit in energese-shapes.tex -- canonical aspect R (outline width
+-- over height), and the fractions fx and fy of the outline the text may
+-- occupy. TeX sizes the outline as the smallest one at aspect R that holds the
+-- label in both directions,
 --
--- Source and storage do not go through \energese@fit: their outline is the
--- circle circumscribing the label box, so the width depends on the label's
--- height too. The figures below are the wide-label limit -- 1 for a circle,
--- 1/1.22 for the tank, whose peaked top adds 0.82 of the label's width.
-local TEXT_FRACTION = {
-    producer = 0.710, consumer = 1.0,   transaction  = 0.5,
-    interaction = 0.708, gain = 0.45,   loop_limited = 0.740,
-    switch = 0.715,   source = 1.0,     storage      = 0.82,
+--     outh = max(minimum, dimx / (fx * R), dimy / fy),    outw = R * outh,
+--
+-- and this reproduces it. Two earlier shortcuts each understated a labelled
+-- symbol badly. Taking the label's width alone ignored `dimy / fy`, which is
+-- what sizes a short label in a flat shape -- "Sun" makes an exchange diamond
+-- 1.0 cm wide, not the 0.6 cm its three letters suggest. And growing only the
+-- width left the height at the bare symbol's, though the shape keeps its
+-- aspect: a labelled gain's height came out at a seventh of what TeX draws.
+-- Measured against TeX's own bounding boxes, both were off by up to that much;
+-- this is within the per-character error of the label estimate.
+local FIT = {
+    producer     = {1.726, 0.710, 1.0},  consumer = {0.877, 1.0,   0.46},
+    transaction  = {2.226, 0.5,   0.5},  interaction = {1.886, 0.708, 0.85},
+    gain         = {0.917, 0.45,  0.55}, loop_limited = {1.019, 0.740, 1.0},
+    switch       = {1.036, 0.715, 0.715},
 }
+
+-- Source and storage do not go through \energese@fit: their outline is a
+-- circle through the corners of the label box (the tank also clears the box
+-- under its peaked top, whose slope is 0.82), each half-dimension floored at
+-- half the style's minimum size, in grid cells.
+local CIRCLE_FLOOR = { source = 0.3592, storage = 0.27475 }
+
+-- How far the drawn outline reaches beyond the dimensions its shape is sized
+-- by, measured from TeX's bounding box of the bare symbol. The tank's shoulders
+-- stand out past its radius, and the loop-limited cap past the body's
+-- half-width; reading either as the outline understated it by 7--9%.
+local OUTLINE_SPAN = { storage = {1.065, 1.025}, loop_limited = {1.085, 1.0} }
+
+-- What \energese@measure adds to the text box: the node's inner sep, TikZ's
+-- default of 0.3333em in \energeselabelfont (8pt), on each side.
+local INNER_SEP = 0.094
+
+-- Height of the label's text box, in cm: one line's height plus depth, and the
+-- baselineskip each further line adds. Calibrated for \energeselabelfont, like
+-- CM_PER_CHAR, by measuring what TeX typesets.
+local LINE_HEIGHT = 0.27
+local BASELINE = 0.335
+
+-- Half the stroke. TeX's outline is the centre of the line, but what a pathway
+-- must clear is its outer edge.
+local HALF_STROKE = 0.02
+
+-- The estimate is a floor, not a target (AGENTS.md): short and a pathway
+-- grazes the symbol, long and things merely sit a little further apart. Built
+-- as above it lands within 0.90--1.05 of TeX's bounding box -- the shortfall
+-- is kerning and the mitred corners of the small, sharp shapes -- so it is
+-- widened by enough to put the worst case back at the outline.
+local ESTIMATE_MARGIN = 1.08
+
+local function label_lines(label)
+    if not label or label == "" then return 0 end
+    local n = 0
+    for _ in tostring(label):gmatch("[^\\]+") do n = n + 1 end
+    return n
+end
 
 local function label_half_width(label)
     if not label or label == "" then return 0 end
     local longest = 0
     for line in tostring(label):gmatch("[^\\]+") do
-        local n = #(line:gsub("%s+$", ""))
-        if n > longest then longest = n end
+        local w = 0
+        for ch in line:gsub("%s+$", ""):gmatch(".") do
+            w = w + (CHAR_CM[ch] or CM_PER_CHAR)
+        end
+        if w > longest then longest = w end
     end
-    return 0.5 * longest * CM_PER_CHAR
+    return 0.5 * longest
+end
+
+local function label_half_height(label)
+    local n = label_lines(label)
+    if n == 0 then return 0 end
+    return 0.5 * (LINE_HEIGHT + (n - 1) * BASELINE)
 end
 
 -- The half-width and half-height a node occupies, label included. One
@@ -574,11 +654,32 @@ end
 function energese.half_extent(node)
     local half = HALF_EXTENT[node.type] or {0.4, 0.3}
     local mag = node.magnitude or 1.0
-    local text = label_half_width(node.label) / (TEXT_FRACTION[node.type] or 1.0)
-    local hw = node.clearance_w
-        or math.max(half[1] * energese.UNIT_CM, text) * mag
-    local hh = node.clearance_h or (half[2] * energese.UNIT_CM * mag)
-    return hw, hh
+    local unit = energese.UNIT_CM
+    local hw, hh = half[1] * unit, half[2] * unit
+    local labelled = node.label and node.label ~= ""
+    local dimx = labelled and (label_half_width(node.label) + INNER_SEP) or 0
+    local dimy = labelled and (label_half_height(node.label) + INNER_SEP) or 0
+
+    local fit, floor = FIT[node.type], CIRCLE_FLOOR[node.type]
+    if fit then
+        local R, fx, fy = fit[1], fit[2], fit[3]
+        local outh = math.max(hh, dimx / (fx * R), dimy / fy)
+        hw, hh = R * outh, outh
+    elseif floor then
+        local dx = math.max(dimx, floor * unit)
+        local dy = math.max(dimy, floor * unit)
+        local r = math.sqrt(dx * dx + dy * dy)
+        if node.type == "storage" then r = math.max(r, dy + 0.82 * dx) end
+        hw, hh = r, r
+    elseif labelled then
+        -- Plain shapes (box, text): the label box itself.
+        hw, hh = math.max(hw, dimx), math.max(hh, dimy)
+    end
+    local span = OUTLINE_SPAN[node.type]
+    if span then hw, hh = hw * span[1], hh * span[2] end
+
+    return node.clearance_w or ((hw * mag + HALF_STROKE) * ESTIMATE_MARGIN),
+           node.clearance_h or ((hh * mag + HALF_STROKE) * ESTIMATE_MARGIN)
 end
 
 -- ---------------------------------------------------------------------------
@@ -1363,6 +1464,43 @@ function energese.dissipation_lanes(sinks, x_coords, ground_x)
     return lane, #ranked
 end
 
+-- How far each tributary drops before it turns in, as an absolute height.
+--
+-- Measured from each symbol's own underside, as it first was, the lanes only
+-- nested when the components shared a row. A component two rows up turned in
+-- two rows higher whatever its reach, so the furthest tributary could run
+-- *above* a nearer one, cut under that one's symbol, be routed round it below
+-- the junction and climb back -- crossing the nearer tributary twice.
+--
+-- So the nesting is enforced in absolute terms. Taking each side of the trunk
+-- in order of reach, a tributary turns in at its own depth (the drop out of its
+-- symbol) or one lane below the nearer one before it, whichever is lower. The
+-- two sides are independent: a tributary arriving from the left never meets
+-- one arriving from the right, and chaining them would push both deeper for
+-- nothing.
+--
+-- `hh_of[id]` is the symbol's half-height. Returns the turn height of every
+-- tributary and the lowest of them.
+function energese.dissipation_turns(sinks, x_coords, y_coords, hh_of,
+                                    ground_x, drop, lane_gap)
+    local lane = energese.dissipation_lanes(sinks, x_coords, ground_x)
+    local order = {}
+    for _, id in ipairs(sinks) do order[#order + 1] = id end
+    table.sort(order, function(a, b) return lane[a] < lane[b] end)
+
+    local turn, last, lowest = {}, {}, nil
+    for _, id in ipairs(order) do
+        local side = ((x_coords[id] or 0) < ground_x) and "left" or "right"
+        local y = (y_coords[id] or 0) - (hh_of[id] or 0.3) - drop
+        if last[side] and y > last[side] - lane_gap then
+            y = last[side] - lane_gap
+        end
+        turn[id], last[side] = y, y
+        if not lowest or y < lowest then lowest = y end
+    end
+    return turn, lowest
+end
+
 -- Collision testing for an author-bent pathway.
 --
 -- An edge carrying `bend left=20` has been routed by its author, and the router
@@ -1504,6 +1642,59 @@ local function path_tangents(pts, out_first, in_last)
     return angles
 end
 
+-- The control points of a dissipation pathway, segment by segment: one
+-- definition for what is drawn and for what the label placement keeps clear of.
+--
+-- It leaves its turning point straight down and runs into the junction along
+-- the chord, but the downward handle is never longer than the drop to the next
+-- point. TikZ's own `out=-90` sizes the handle from the chord, a third of it --
+-- for a tributary turning in five units out and a quarter of a unit above the
+-- junction, two units of handle, and the curve sagged far below the junction
+-- and climbed back into it from underneath. With the handle bounded by the
+-- drop, every control point lies at or above the end it is heading for, and a
+-- cubic stays inside the hull of its control points.
+local function heat_controls(pts)
+    local angles = path_tangents(pts, -90)
+    local segs = {}
+    for i = 1, #pts - 1 do
+        local ax, ay = pts[i][1], pts[i][2]
+        local bx, by = pts[i + 1][1], pts[i + 1][2]
+        local d = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
+        local d_out, d_in = d / 3, d / 3
+        if i == 1 then d_out = math.min(d_out, math.max(ay - by, 0.05)) end
+        local o, n = math.rad(angles[i][1]), math.rad(angles[i][2])
+        segs[i] = { ax, ay, ax + d_out * math.cos(o), ay + d_out * math.sin(o),
+                    bx + d_in * math.cos(n), by + d_in * math.sin(n), bx, by }
+    end
+    return segs
+end
+
+local function heat_path(pts)
+    local parts = {}
+    for _, c in ipairs(heat_controls(pts)) do
+        parts[#parts + 1] = string.format(
+            ".. controls (%.4f, %.4f) and (%.4f, %.4f) .. (%.4f, %.4f)",
+            c[3], c[4], c[5], c[6], c[7], c[8])
+    end
+    return table.concat(parts, " ")
+end
+
+local function heat_samples(pts, steps)
+    local out = { { pts[1][1], pts[1][2] } }
+    for _, c in ipairs(heat_controls(pts)) do
+        for k = 1, steps do
+            local t = k / steps
+            local m = 1 - t
+            out[#out + 1] = {
+                m*m*m*c[1] + 3*m*m*t*c[3] + 3*m*t*t*c[5] + t*t*t*c[7],
+                m*m*m*c[2] + 3*m*m*t*c[4] + 3*m*t*t*c[6] + t*t*t*c[8],
+            }
+        end
+    end
+    return out
+end
+energese.heat_samples = heat_samples
+
 -- Does the curve through these points clear every obstacle? The polyline the
 -- router returns is clear by construction; the curve drawn through it cuts the
 -- corners, and that is what the reader sees.
@@ -1571,7 +1762,10 @@ local LABEL_DEFAULT = "midway, above, inner sep=2pt, font=\\energeselabelfont"
 
 -- Fractions along the first segment, which is the one a label rides. Ordered
 -- by preference: a label that has no reason to move stays at the midpoint.
-local LABEL_POS = { 0.5, 0.35, 0.65, 0.22, 0.78 }
+-- The two near the ends come last, for a short pathway crossing the system
+-- window: every position in the middle stretch straddles the frame, and the
+-- only clear room is beside one end.
+local LABEL_POS = { 0.5, 0.35, 0.65, 0.22, 0.78, 0.1, 0.9 }
 -- Distances clear of the pathway, in diagram units. The last two are wide
 -- enough to escape a corridor between two symbols, which is where the short
 -- ones all collide with something and the label has nowhere to go.
@@ -1672,15 +1866,13 @@ function energese.place_edge_labels(edges, geom, boxes, x_coords, y_coords,
     -- for that.
     if bundle then
         for _, path in ipairs(bundle.paths) do
-            local angles = path_tangents(path.pts, -90, 90)
-            for k = 1, #path.pts - 1 do
-                local samples = cubic_samples(path.pts[k][1], path.pts[k][2],
-                    path.pts[k + 1][1], path.pts[k + 1][2],
-                    angles[k][1], angles[k][2], 10)
-                for j = 1, #samples - 1 do
-                    segments[#segments + 1] = { samples[j][1], samples[j][2],
-                                                samples[j + 1][1], samples[j + 1][2] }
-                end
+            -- The straight drop out of the symbol, then the curve: both drawn.
+            segments[#segments + 1] = { path.pts[1][1], path.top,
+                                        path.pts[1][1], path.pts[1][2] }
+            local samples = heat_samples(path.pts, 10)
+            for j = 1, #samples - 1 do
+                segments[#segments + 1] = { samples[j][1], samples[j][2],
+                                            samples[j + 1][1], samples[j + 1][2] }
             end
         end
         segments[#segments + 1] = { bundle.ground_x, bundle.collect_y,
@@ -1875,6 +2067,32 @@ function energese.port_requests(edges, node_map, x_coords, y_coords)
     return requests
 end
 
+-- The options a caller passes to the picture, made safe for a layout computed
+-- in diagram units.
+--
+-- TikZ's `scale` multiplies coordinates and leaves nodes alone, so on its own
+-- it moves the symbols closer together without making them any smaller: at
+-- 0.42 every symbol is 2.4 times too big for the room the layout gave it, they
+-- overlap, and pathways routed clear of them run straight through. The layout
+-- is one rigid drawing, so a scaled diagram must scale as one -- `transform
+-- shape` makes the nodes and their labels follow the coordinates. xscale and
+-- yscale have no such remedy: applied to the nodes they distort Odum's
+-- symbols, and not applied they break the layout, so they are refused.
+function energese.picture_options(options)
+    options = options or ""
+    local padded = "," .. options .. ","
+    for _, key in ipairs({ "xscale", "yscale" }) do
+        if padded:find("[,%s]" .. key .. "%s*=") then
+            report_error(key .. " would distort the symbols, or else break the "
+                .. "layout; use scale, or set \\energeseunit and the spacing")
+        end
+    end
+    if padded:find("[,%s]scale%s*=") and not padded:find("transform shape") then
+        options = options .. ", transform shape"
+    end
+    return options
+end
+
 function energese.render(data, options)
     -- A GSSK model is normalised into an energese one first, so that both
     -- front ends and every check below see one shape of model. A native model
@@ -1923,7 +2141,7 @@ function energese.render(data, options)
         node_map[node.id] = node
     end
 
-    tex.print("\\begin{tikzpicture}[" .. options .. "]")
+    tex.print("\\begin{tikzpicture}[" .. energese.picture_options(options) .. "]")
 
     -- Nodes are created once, with their real labels, because a symbol sizes
     -- itself to its label: a placeholder node carrying an empty label would be
@@ -2015,6 +2233,40 @@ function energese.render(data, options)
         end
     end
 
+    -- The dissipation funnel's shape, settled before the window because the
+    -- window has to hold it: where the trunk falls, how far each tributary
+    -- drops out of its symbol, and the lane each one turns in at.
+    local ground_x, drop, lane_gap, turns, lowest_turn
+    if #sinks > 0 then
+        local min_x, max_x = 1e9, -1e9
+        for _, x in pairs(x_coords) do
+            if x > max_x then max_x = x end
+            if x < min_x then min_x = x end
+        end
+        ground_x = (data.metadata and data.metadata.ground_x)
+                   or (min_x + max_x) / 2
+        -- Drop straight out of the symbol before curving in, so the
+        -- pathway leaves vertically as Odum draws it and the bend happens
+        -- in open space rather than against the symbol's edge.
+        drop = 0.45 * row_spacing
+        lane_gap = 0.18 * row_spacing
+        -- Measured from the symbol's underside, not its centre: a drop
+        -- shorter than the symbol's half-height would run back up inside the
+        -- glyph, and the pathway would appear to start somewhere other than
+        -- its connection port.
+        local hh_of = {}
+        for _, box in ipairs(boxes) do hh_of[box.id] = box.hh end
+        turns, lowest_turn = energese.dissipation_turns(sinks, x_coords,
+            y_coords, hh_of, ground_x, drop, lane_gap)
+    end
+    -- Where the tributaries meet, relative to the window's underside.
+    local COLLECT_RISE = 0.45 * row_spacing
+    -- How far below the deepest turn the junction must be. One lane was the
+    -- least that kept the order, but tributaries arriving that flat ran into
+    -- each other for the last stretch and read as one line; a full drop lets
+    -- them meet the junction at an angle, as Odum's do.
+    local FUNNEL_FALL = 0.45 * row_spacing
+
     -- The system window: the optional frame declaring what the model treats as
     -- inside the system. Settled here rather than where it is drawn, because
     -- the pathway labels below have to keep off it.
@@ -2042,6 +2294,38 @@ function energese.render(data, options)
             windows[#windows + 1] = sb
             if not window_min_y or sb.y_min < window_min_y then
                 window_min_y = sb.y_min
+            end
+        end
+
+        -- The funnel converges inside the window, so the window must be deep
+        -- enough for its deepest lane and the junction under it. One drawn
+        -- too shallow -- by hand, usually -- left the tributaries no room:
+        -- every lane below the floor was clamped to the same height, and they
+        -- ran along the bottom of the frame and across each other. Extending
+        -- the floor encloses nothing new, only empty space, so it is done, and
+        -- said, rather than drawing the funnel wrong.
+        if lowest_turn and window_min_y then
+            -- Rounded down to the hundredth the warning reports, so that the
+            -- value it gives, copied into the model, is enough to silence it.
+            local need = math.floor((lowest_turn - FUNNEL_FALL - COLLECT_RISE)
+                                    * 100) / 100
+            if window_min_y > need + 1e-9 then
+                for _, sb in ipairs(windows) do
+                    if sb.y_min == window_min_y then
+                        if data.metadata.system_boundary ~= true then
+                            local msg = string.format("system window lowered "
+                                .. "from y=%.2f to y=%.2f to hold the "
+                                .. "dissipation funnel", sb.y_min, need)
+                            if luatexbase and luatexbase.module_warning then
+                                luatexbase.module_warning("energese", msg)
+                            else
+                                io.stderr:write("[energese] " .. msg .. "\n")
+                            end
+                        end
+                        sb.y_min = need
+                    end
+                end
+                window_min_y = need
             end
         end
     end
@@ -2131,12 +2415,9 @@ function energese.render(data, options)
     -- dissipation pathway the placement could not see.
     local bundle = nil
     if #sinks > 0 then
-        local min_y, min_x, max_x = 1e9, 1e9, -1e9
-        for id, x in pairs(x_coords) do
-            local y = y_coords[id]
-            if y < min_y then min_y = y end
-            if x > max_x then max_x = x end
-            if x < min_x then min_x = x end
+        local min_y = 1e9
+        for id in pairs(x_coords) do
+            if y_coords[id] < min_y then min_y = y_coords[id] end
         end
 
         local base_y = min_y
@@ -2146,14 +2427,13 @@ function energese.render(data, options)
         -- back, and the curve visibly kinks; giving it room to fall makes
         -- the convergence smooth.
         local ground_y = (data.metadata and data.metadata.heat_sink_y)
-                         or (base_y - 2.0 * row_spacing)
+                         or math.min(base_y - 2.0 * row_spacing,
+                                     lowest_turn - row_spacing)
         -- A ground inside the window would be wrong whatever the model
         -- asked for, so clamp rather than honour it.
         if window_min_y and ground_y > window_min_y - 0.3 then
             ground_y = window_min_y - row_spacing
         end
-        local ground_x = (data.metadata and data.metadata.ground_x)
-                         or (min_x + max_x) / 2
 
         -- The pathways leave each component downwards and converge on the
         -- ground, rather than meeting a horizontal floor line: Odum draws
@@ -2165,43 +2445,28 @@ function energese.render(data, options)
         -- one aggregate flow of used energy, not several.
         local collect_y = ground_y
         if window_min_y then
-            collect_y = window_min_y + 0.45 * row_spacing
+            collect_y = window_min_y + COLLECT_RISE
             if collect_y <= ground_y then collect_y = ground_y end
         end
 
-        -- Drop straight out of the symbol before curving in, so the
-        -- pathway leaves vertically as Odum draws it and the bend happens
-        -- in open space rather than against the symbol's edge.
-        local drop = 0.45 * row_spacing
-        local lane_of = energese.dissipation_lanes(sinks, x_coords, ground_x)
-        local lane_gap = 0.18 * row_spacing
         bundle = { ground_x = ground_x, ground_y = ground_y,
                    collect_y = collect_y, paths = {} }
         for _, id in ipairs(sinks) do
-            -- Dissipation must clear the other symbols too: a heat pathway
-            -- crossing a component reads as flow into that component.
-            -- Measure the drop from the symbol's underside, not its
-            -- centre: a drop shorter than the symbol's half-height would
-            -- run back up inside the glyph, and the pathway would appear
-            -- to start somewhere other than its connection port.
-            local hh = 0.3
-            for _, box in ipairs(boxes) do
-                if box.id == id then hh = box.hh end
-            end
             -- The lane is how far this tributary drops before it turns in,
             -- not a point it turns at. Expressing it as a waypoint put a
             -- corner in the middle of the pathway, and the tangent at an
             -- interior waypoint is the chord spanning its neighbours -- which
             -- at a near-right-angle turn points back the way the pathway came,
             -- and bulged the curve out sideways before it could turn. One
-            -- segment from a lane-dependent depth straight to the junction
-            -- keeps the nesting and keeps the curve.
-            local sx = x_coords[id]
-            local sy = y_coords[id] - hh - drop
-                       - (lane_of[id] - 1) * lane_gap
+            -- segment from the lane's depth straight to the junction keeps the
+            -- nesting and keeps the curve.
+            local sx, sy = x_coords[id], turns[id]
             -- Never below the junction: a tributary that dropped past it would
-            -- have to come back up.
+            -- have to come back up. Only an author's heat_sink_y with no
+            -- window can bring that about; a window is deepened to prevent it.
             if sy < collect_y + lane_gap then sy = collect_y + lane_gap end
+            -- Dissipation must clear the other symbols too: a heat pathway
+            -- crossing a component reads as flow into that component.
             local others = {}
             for _, box in ipairs(boxes) do
                 if box.id ~= id then others[#others + 1] = box end
@@ -2213,7 +2478,12 @@ function energese.render(data, options)
                 pts[#pts + 1] = w
             end
             pts[#pts + 1] = { ground_x, collect_y }
-            bundle.paths[#bundle.paths + 1] = { id = id, pts = pts }
+            local hh = 0.3
+            for _, box in ipairs(boxes) do
+                if box.id == id then hh = box.hh end
+            end
+            bundle.paths[#bundle.paths + 1] = { id = id, pts = pts,
+                                                top = y_coords[id] - hh }
         end
     end
 
@@ -2299,8 +2569,7 @@ function energese.render(data, options)
             tex.print(string.format(
                 "\\energeserecallport{heat@%s}"
                 .. "\\draw[energese heat] (\\energeseportname) -- (%.4f, %.4f) %s;",
-                path.id, path.pts[1][1], path.pts[1][2],
-                energese.smooth_path(path.pts, "", -90)))
+                path.id, path.pts[1][1], path.pts[1][2], heat_path(path.pts)))
         end
 
         -- One line from the collection point out through the frame, and

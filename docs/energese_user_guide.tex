@@ -54,12 +54,20 @@ An optional argument is passed straight through to the underlying
 \renderEnergese[scale=0.8]{examples/simple_system.json}
 \end{verbatim}
 
+\noindent A \texttt{scale} shrinks the diagram as one picture, labels included:
+the layout is computed for symbols at their full size, so they must scale with
+the coordinates, and \texttt{transform shape} is added for you. A
+\texttt{xscale} or \texttt{yscale} is refused, because it would distort the
+symbols. To space a diagram out rather than shrink it, change
+\texttt{column\_spacing} and \texttt{row\_spacing}; to resize the symbols,
+\verb|\energeseunit| (Section~\ref{sec:symbols}).
+
 The path is resolved relative to the current directory first, then through
 \texttt{kpsewhich}, so a document is not tied to the directory it is compiled
 from. That call produces:
 
 \begin{center}
-\renderEnergese[scale=0.75]{examples/simple_system.json}
+\renderEnergese{examples/simple_system.json}
 \end{center}
 
 \subsection{From inline JSON}
@@ -105,7 +113,7 @@ front end is expressible in the other.
 \noindent which renders as:
 
 \begin{center}
-\begin{energese}[scale=0.75]
+\begin{energese}
     \esmeta{column_spacing=3.0, row_spacing=1.5, show_heat_sink=true}
 
     \esnode{sun}{source}         {Tr=1,    label={Sun}}
@@ -416,7 +424,7 @@ transformity, takes no part in the ordering, and terminates pathways rather than
 transforming anything:
 
 \begin{center}
-\begin{energese}[scale=0.8]
+\begin{energese}
     \esmeta{column_spacing=3.2, row_spacing=1.6}
     \esnode{sun}{source}     {Tr=1,    label={Sun}}
     \esnode{grass}{producer} {Tr=100,  label={Grass}}
@@ -706,6 +714,12 @@ macro-level inputs and outputs are. The ground symbol is always placed
 cannot sit within the frame. A \texttt{heat\_sink\_y} that would put the ground
 inside the window is overridden rather than honoured.
 
+The pathways nest: the component furthest from the ground turns in lowest and
+runs outside the nearer ones all the way in, so none of them cross. That needs
+room under the components, and a frame given explicit coordinates that leaves
+too little is deepened to make it, with a warning giving the new
+\texttt{y\_min}. Copy that value into the model to silence it.
+
 \section{A worked example}
 
 \texttt{examples/aggregated-economy.json} reproduces a classic Odum figure. It
@@ -713,7 +727,7 @@ exercises manual coordinates, a system boundary, a relocated heat sink and
 several money-feedback arcs:
 
 \begin{center}
-\renderEnergese[scale=0.42]{examples/aggregated-economy.json}
+\renderEnergese{examples/aggregated-economy.json}
 \end{center}
 
 \end{document}
