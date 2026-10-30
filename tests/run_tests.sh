@@ -66,6 +66,13 @@ if [ "$PHASE" == "all" ] || [ "$PHASE" == "6" ]; then
     run_test_suite "tests/unit/test_routing"
 fi
 
+# The size the layout assumes for each symbol, against the size TeX draws it.
+# Asserting, like test_ports: a shape whose sizing rule drifts from the
+# estimate fails here instead of in a diagram that overlaps.
+if [ "$PHASE" == "all" ] || [ "$PHASE" == "13" ]; then
+    run_test_suite "tests/unit/test_extents"
+fi
+
 # Reading a GSSK model: the normalisation that lets one file simulate and draw.
 if [ "$PHASE" == "all" ] || [ "$PHASE" == "7" ]; then
     run_test_suite "tests/unit/test_gssk"
@@ -100,6 +107,7 @@ if [ "$PHASE" == "all" ] || [ "$PHASE" == "12" ]; then
     grep "Module energese Error: Invalid JSON syntax" "${suite}.log" > /dev/null || { echo "✗ Missing: Invalid JSON syntax error"; MISSING_ERRORS=1; }
     grep "Node 'A' missing required field 'Tr'" "${suite}.log" > /dev/null || { echo "✗ Missing: Missing field Tr error"; MISSING_ERRORS=1; }
     grep "Edge references undefined node 'B'" "${suite}.log" > /dev/null || { echo "✗ Missing: Undefined node error"; MISSING_ERRORS=1; }
+    grep "xscale would distort the symbols" "${suite}.log" > /dev/null || { echo "✗ Missing: xscale refused error"; MISSING_ERRORS=1; }
 
     if [ $MISSING_ERRORS -eq 0 ]; then
         echo "✓ PASS: $suite (All expected errors caught)"

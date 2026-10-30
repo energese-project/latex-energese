@@ -534,38 +534,118 @@ local HALF_EXTENT = {
 -- Estimated height of a displaced label, in diagram units.
 local LABEL_HEIGHT = 0.30
 
--- Rough width of a label character, in cm. Calibrated for \energeselabelfont
--- (\sffamily\footnotesize); change it with that font. Used to decide whether a
--- label fits its cell and to size the obstacle a displaced one presents, so an
--- over-estimate is the safe direction.
+-- Width of each character of \energeselabelfont (\sffamily\footnotesize, TeX
+-- Gyre Heros Cn), in cm, as TeX sets it -- measured glyph by glyph, not
+-- guessed. A single average width, 0.14 cm, was what this used: it over-read
+-- lowercase text by a quarter, which made "Environmental Systems" a fifth
+-- wider than drawn and pushed labels off positions that were in fact clear,
+-- and it under-read capitals, so a lone "Q" was too small. Kerning is ignored;
+-- it moves a word by a few hundredths of a centimetre. Change the table with
+-- the font. Anything outside it -- markup, non-ASCII -- reads at CM_PER_CHAR.
 local CM_PER_CHAR = 0.14
+local CHAR_CM = {}
+for _, row in ipairs({
+    { 0.051, "'`ijl" },
+    { 0.060, "|" },
+    { 0.064, " !,./:;I[\\]ft" },
+    { 0.077, "\"()-r{}" },
+    { 0.090, "*" },
+    { 0.108, "^" },
+    { 0.115, "Jcksvxyz" },
+    { 0.128, "#$0123456789?L_abdeghnopqu" },
+    { 0.135, "+<=>~" },
+    { 0.141, "FTZ" },
+    { 0.154, "&ABEKPSVXY" },
+    { 0.166, "CDHNRUw" },
+    { 0.179, "GOQ" },
+    { 0.192, "Mm" },
+    { 0.205, "%" },
+    { 0.218, "W" },
+    { 0.234, "@" },
+}) do
+    for ch in row[2]:gmatch(".") do CHAR_CM[ch] = row[1] end
+end
 
--- What fraction of a symbol's width its label may occupy -- the `fx` each
--- shape declares to \energese@fit in energese-shapes.tex, and the reason a
--- labelled symbol is wider than its label. \energese@fit sets the outline
--- width to label-width / fx, so dividing here reproduces exactly what TeX will
--- do. Taking the label's own width as the symbol's, as this did, understated
--- a labelled exchange diamond by a factor of two, and the diamond attached to
--- a consumer overlapped it.
+-- How each shape fits its outline to its label: the arguments it passes to
+-- \energese@fit in energese-shapes.tex -- canonical aspect R (outline width
+-- over height), and the fractions fx and fy of the outline the text may
+-- occupy. TeX sizes the outline as the smallest one at aspect R that holds the
+-- label in both directions,
 --
--- Source and storage do not go through \energese@fit: their outline is the
--- circle circumscribing the label box, so the width depends on the label's
--- height too. The figures below are the wide-label limit -- 1 for a circle,
--- 1/1.22 for the tank, whose peaked top adds 0.82 of the label's width.
-local TEXT_FRACTION = {
-    producer = 0.710, consumer = 1.0,   transaction  = 0.5,
-    interaction = 0.708, gain = 0.45,   loop_limited = 0.740,
-    switch = 0.715,   source = 1.0,     storage      = 0.82,
+--     outh = max(minimum, dimx / (fx * R), dimy / fy),    outw = R * outh,
+--
+-- and this reproduces it. Two earlier shortcuts each understated a labelled
+-- symbol badly. Taking the label's width alone ignored `dimy / fy`, which is
+-- what sizes a short label in a flat shape -- "Sun" makes an exchange diamond
+-- 1.0 cm wide, not the 0.6 cm its three letters suggest. And growing only the
+-- width left the height at the bare symbol's, though the shape keeps its
+-- aspect: a labelled gain's height came out at a seventh of what TeX draws.
+-- Measured against TeX's own bounding boxes, both were off by up to that much;
+-- this is within the per-character error of the label estimate.
+local FIT = {
+    producer     = {1.726, 0.710, 1.0},  consumer = {0.877, 1.0,   0.46},
+    transaction  = {2.226, 0.5,   0.5},  interaction = {1.886, 0.708, 0.85},
+    gain         = {0.917, 0.45,  0.55}, loop_limited = {1.019, 0.740, 1.0},
+    switch       = {1.036, 0.715, 0.715},
 }
+
+-- Source and storage do not go through \energese@fit: their outline is a
+-- circle through the corners of the label box (the tank also clears the box
+-- under its peaked top, whose slope is 0.82), each half-dimension floored at
+-- half the style's minimum size, in grid cells.
+local CIRCLE_FLOOR = { source = 0.3592, storage = 0.27475 }
+
+-- How far the drawn outline reaches beyond the dimensions its shape is sized
+-- by, measured from TeX's bounding box of the bare symbol. The tank's shoulders
+-- stand out past its radius, and the loop-limited cap past the body's
+-- half-width; reading either as the outline understated it by 7--9%.
+local OUTLINE_SPAN = { storage = {1.065, 1.025}, loop_limited = {1.085, 1.0} }
+
+-- What \energese@measure adds to the text box: the node's inner sep, TikZ's
+-- default of 0.3333em in \energeselabelfont (8pt), on each side.
+local INNER_SEP = 0.094
+
+-- Height of the label's text box, in cm: one line's height plus depth, and the
+-- baselineskip each further line adds. Calibrated for \energeselabelfont, like
+-- CM_PER_CHAR, by measuring what TeX typesets.
+local LINE_HEIGHT = 0.27
+local BASELINE = 0.335
+
+-- Half the stroke. TeX's outline is the centre of the line, but what a pathway
+-- must clear is its outer edge.
+local HALF_STROKE = 0.02
+
+-- The estimate is a floor, not a target (AGENTS.md): short and a pathway
+-- grazes the symbol, long and things merely sit a little further apart. Built
+-- as above it lands within 0.90--1.05 of TeX's bounding box -- the shortfall
+-- is kerning and the mitred corners of the small, sharp shapes -- so it is
+-- widened by enough to put the worst case back at the outline.
+local ESTIMATE_MARGIN = 1.08
+
+local function label_lines(label)
+    if not label or label == "" then return 0 end
+    local n = 0
+    for _ in tostring(label):gmatch("[^\\]+") do n = n + 1 end
+    return n
+end
 
 local function label_half_width(label)
     if not label or label == "" then return 0 end
     local longest = 0
     for line in tostring(label):gmatch("[^\\]+") do
-        local n = #(line:gsub("%s+$", ""))
-        if n > longest then longest = n end
+        local w = 0
+        for ch in line:gsub("%s+$", ""):gmatch(".") do
+            w = w + (CHAR_CM[ch] or CM_PER_CHAR)
+        end
+        if w > longest then longest = w end
     end
-    return 0.5 * longest * CM_PER_CHAR
+    return 0.5 * longest
+end
+
+local function label_half_height(label)
+    local n = label_lines(label)
+    if n == 0 then return 0 end
+    return 0.5 * (LINE_HEIGHT + (n - 1) * BASELINE)
 end
 
 -- The half-width and half-height a node occupies, label included. One
@@ -574,11 +654,32 @@ end
 function energese.half_extent(node)
     local half = HALF_EXTENT[node.type] or {0.4, 0.3}
     local mag = node.magnitude or 1.0
-    local text = label_half_width(node.label) / (TEXT_FRACTION[node.type] or 1.0)
-    local hw = node.clearance_w
-        or math.max(half[1] * energese.UNIT_CM, text) * mag
-    local hh = node.clearance_h or (half[2] * energese.UNIT_CM * mag)
-    return hw, hh
+    local unit = energese.UNIT_CM
+    local hw, hh = half[1] * unit, half[2] * unit
+    local labelled = node.label and node.label ~= ""
+    local dimx = labelled and (label_half_width(node.label) + INNER_SEP) or 0
+    local dimy = labelled and (label_half_height(node.label) + INNER_SEP) or 0
+
+    local fit, floor = FIT[node.type], CIRCLE_FLOOR[node.type]
+    if fit then
+        local R, fx, fy = fit[1], fit[2], fit[3]
+        local outh = math.max(hh, dimx / (fx * R), dimy / fy)
+        hw, hh = R * outh, outh
+    elseif floor then
+        local dx = math.max(dimx, floor * unit)
+        local dy = math.max(dimy, floor * unit)
+        local r = math.sqrt(dx * dx + dy * dy)
+        if node.type == "storage" then r = math.max(r, dy + 0.82 * dx) end
+        hw, hh = r, r
+    elseif labelled then
+        -- Plain shapes (box, text): the label box itself.
+        hw, hh = math.max(hw, dimx), math.max(hh, dimy)
+    end
+    local span = OUTLINE_SPAN[node.type]
+    if span then hw, hh = hw * span[1], hh * span[2] end
+
+    return node.clearance_w or ((hw * mag + HALF_STROKE) * ESTIMATE_MARGIN),
+           node.clearance_h or ((hh * mag + HALF_STROKE) * ESTIMATE_MARGIN)
 end
 
 -- ---------------------------------------------------------------------------
@@ -1571,7 +1672,10 @@ local LABEL_DEFAULT = "midway, above, inner sep=2pt, font=\\energeselabelfont"
 
 -- Fractions along the first segment, which is the one a label rides. Ordered
 -- by preference: a label that has no reason to move stays at the midpoint.
-local LABEL_POS = { 0.5, 0.35, 0.65, 0.22, 0.78 }
+-- The two near the ends come last, for a short pathway crossing the system
+-- window: every position in the middle stretch straddles the frame, and the
+-- only clear room is beside one end.
+local LABEL_POS = { 0.5, 0.35, 0.65, 0.22, 0.78, 0.1, 0.9 }
 -- Distances clear of the pathway, in diagram units. The last two are wide
 -- enough to escape a corridor between two symbols, which is where the short
 -- ones all collide with something and the label has nowhere to go.
@@ -1875,6 +1979,32 @@ function energese.port_requests(edges, node_map, x_coords, y_coords)
     return requests
 end
 
+-- The options a caller passes to the picture, made safe for a layout computed
+-- in diagram units.
+--
+-- TikZ's `scale` multiplies coordinates and leaves nodes alone, so on its own
+-- it moves the symbols closer together without making them any smaller: at
+-- 0.42 every symbol is 2.4 times too big for the room the layout gave it, they
+-- overlap, and pathways routed clear of them run straight through. The layout
+-- is one rigid drawing, so a scaled diagram must scale as one -- `transform
+-- shape` makes the nodes and their labels follow the coordinates. xscale and
+-- yscale have no such remedy: applied to the nodes they distort Odum's
+-- symbols, and not applied they break the layout, so they are refused.
+function energese.picture_options(options)
+    options = options or ""
+    local padded = "," .. options .. ","
+    for _, key in ipairs({ "xscale", "yscale" }) do
+        if padded:find("[,%s]" .. key .. "%s*=") then
+            report_error(key .. " would distort the symbols, or else break the "
+                .. "layout; use scale, or set \\energeseunit and the spacing")
+        end
+    end
+    if padded:find("[,%s]scale%s*=") and not padded:find("transform shape") then
+        options = options .. ", transform shape"
+    end
+    return options
+end
+
 function energese.render(data, options)
     -- A GSSK model is normalised into an energese one first, so that both
     -- front ends and every check below see one shape of model. A native model
@@ -1923,7 +2053,7 @@ function energese.render(data, options)
         node_map[node.id] = node
     end
 
-    tex.print("\\begin{tikzpicture}[" .. options .. "]")
+    tex.print("\\begin{tikzpicture}[" .. energese.picture_options(options) .. "]")
 
     -- Nodes are created once, with their real labels, because a symbol sizes
     -- itself to its label: a placeholder node carrying an empty label would be
