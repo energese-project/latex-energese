@@ -390,6 +390,14 @@ local QUALITY_RISES = { energy = true }
 --   seller --energy--> diamond --energy--> buyer
 --   buyer  --money---> diamond --money---> seller
 -- ---------------------------------------------------------------------------
+-- An exchange measured from aggregated-economy.png, good to about 0.2 mm: its
+-- two tracks run about 1.2 mm apart, centre to centre, through a diamond about
+-- 4.4 mm long and 2.6 mm tall. The bare transaction symbol is 12.1 mm long, so
+-- the marker is drawn at 0.36 of it; centred between the tracks, each runs
+-- 0.6 mm from the diamond's middle, inside its 1 mm half-height.
+local EXCHANGE_GAP = 0.12
+local EXCHANGE_MAGNITUDE = 0.36
+
 function energese.expand_exchanges(data)
     local added = {}
     for _, node in ipairs(data.nodes) do
@@ -406,22 +414,21 @@ function energese.expand_exchanges(data)
                 label = node.energy_label, options = "bend left=8",
                 exchange = node.id, exchange_leg = "goods",
                 marker = node.type or "transaction",
-                marker_magnitude = node.magnitude or 0.62,
+                marker_magnitude = node.magnitude or EXCHANGE_MAGNITUDE,
             }
-            -- Money is the goods' own track run backwards: the same anchors,
-            -- so it takes the port beside the goods at each end, on the left
-            -- of the goods' direction of travel (clockwise at the buyer,
-            -- anticlockwise at the seller); and the same geometry, mirrored
-            -- once the goods' route is settled. Given the money anchors and a
+            -- Money is the goods' own track, run backwards a fixed distance to
+            -- its left (EXCHANGE_GAP): it starts and ends beside the goods'
+            -- ports and copies their settled route, so the two stay parallel
+            -- all the way, as Odum draws them. Given the money anchors and a
             -- bend of its own, as it first was, it left the upper half of each
             -- symbol on a separate arc and read as a second pathway that
             -- happened to pass near the diamond, not as the other half of one
-            -- transaction.
+            -- transaction. Nor can it take the next port along: ports are a
+            -- pitch apart *along the outline*, so on a corner or a round cap
+            -- the next one lands well away from the goods.
             added[#added + 1] = {
                 from = node.buyer, to = node.seller, type = "money_feedback",
                 label = node.money_label,
-                from_anchor = "energy_in", to_anchor = "energy_out",
-                port_side_from = -1, port_side_to = 1,
                 exchange = node.id, exchange_leg = "money",
             }
         end
@@ -2064,12 +2071,13 @@ function energese.port_requests(edges, node_map, x_coords, y_coords)
     local groups, order = {}, {}
     for i, edge in ipairs(edges) do
         local from_anchor, to_anchor = energese.edge_anchors(edge, node_map)
-        for _, req in ipairs({
-            { node = edge.from, anchor = from_anchor, other = edge.to,
-              key = "e" .. i .. "f", side = edge.port_side_from },
-            { node = edge.to,   anchor = to_anchor,   other = edge.from,
-              key = "e" .. i .. "t", side = edge.port_side_to },
-        }) do
+        -- An exchange's money track takes no ports of its own: it runs
+        -- beside the goods' (see expand_exchanges).
+        local requests_for_edge = (edge.exchange_leg == "money") and {} or {
+            { node = edge.from, anchor = from_anchor, other = edge.to,   key = "e" .. i .. "f" },
+            { node = edge.to,   anchor = to_anchor,   other = edge.from, key = "e" .. i .. "t" },
+        }
+        for _, req in ipairs(requests_for_edge) do
             local dx = (x_coords[req.other] or 0) - (x_coords[req.node] or 0)
             local dy = (y_coords[req.other] or 0) - (y_coords[req.node] or 0)
             req.bearing = math.deg(math.atan(dy, dx))
@@ -2391,17 +2399,14 @@ function energese.render(data, options)
     for _, req in ipairs(energese.port_requests(data.edges, node_map,
                                                 x_coords, y_coords)) do
         tex.print(string.format(
-            "\\def\\energeseportside{%s}"
-            .. "\\energeseport{%s}{%s}{%s}\\energesekeepport{%s}"
-            .. "\\def\\energeseportside{}",
-            req.side and tostring(req.side) or "",
+            "\\energeseport{%s}{%s}{%s}\\energesekeepport{%s}",
             req.node, req.anchor, req.other, req.key))
     end
 
     -- Pathway geometry, settled for every edge before any is drawn. The
     -- labels are placed against it below, and a label can only be kept clear
     -- of the pathways if the pathways are all known first.
-    local geom, goods_geom = {}, {}
+    local geom, goods_geom, goods_index = {}, {}, {}
     for edge_index, edge in ipairs(data.edges) do
         local from, to = edge.from, edge.to
         local options = edge.options or ""
@@ -2450,17 +2455,32 @@ function energese.render(data, options)
         end
 
         geom[edge_index] = { options = options, waypoints = waypoints }
-        if edge.exchange_leg == "goods" then goods_geom[edge.exchange] = geom[edge_index] end
+        if edge.exchange_leg == "goods" then
+            goods_geom[edge.exchange] = geom[edge_index]
+            goods_index[edge.exchange] = edge_index
+        end
     end
 
     -- An exchange's money track mirrors the goods' settled route, so the two
-    -- stay a port apart all the way: the same bend seen from the other end
-    -- (left becomes right), or the same waypoints in reverse.
+    -- stay EXCHANGE_GAP apart all the way: the same bend seen from the other
+    -- end (left becomes right), or the same waypoints in reverse, each moved
+    -- the gap to the left of the goods' travel there.
     for edge_index, edge in ipairs(data.edges) do
         local g = edge.exchange_leg == "money" and goods_geom[edge.exchange]
         if g then
+            local goods = data.edges[goods_index[edge.exchange]]
+            local route = { { x_coords[goods.from], y_coords[goods.from] } }
+            for _, w in ipairs(g.waypoints) do route[#route + 1] = w end
+            route[#route + 1] = { x_coords[goods.to], y_coords[goods.to] }
             local reversed = {}
-            for k = #g.waypoints, 1, -1 do reversed[#reversed + 1] = g.waypoints[k] end
+            for k = #route - 1, 2, -1 do
+                local tx = route[k + 1][1] - route[k - 1][1]
+                local ty = route[k + 1][2] - route[k - 1][2]
+                local len = math.sqrt(tx * tx + ty * ty)
+                if len < 1e-9 then len = 1 end
+                reversed[#reversed + 1] = { route[k][1] - ty / len * EXCHANGE_GAP,
+                                            route[k][2] + tx / len * EXCHANGE_GAP }
+            end
             local mirrored = g.options:gsub("bend (%a+)", function(side)
                 if side == "left" then return "bend right" end
                 if side == "right" then return "bend left" end
@@ -2570,16 +2590,15 @@ function energese.render(data, options)
 
         -- An exchange marker rides the pathway rather than terminating it:
         -- placed at the midpoint, rotated to the flow, and unfilled so the
-        -- pathway runs visibly through it. It sits half a port pitch towards
-        -- the money track, between the two, so that both run through the
-        -- diamond -- goods through its lower half, money its upper -- as on
-        -- Odum's symbol sheet.
+        -- pathway runs visibly through it. It sits halfway towards the money
+        -- track, between the two, so that both run through the diamond --
+        -- goods through one half, money the other -- as on Odum's sheet.
         local marker_code = ""
         if edge.marker then
             marker_code = string.format(
                 "node[energese %s, energese magnitude=%f, pos=0.5, sloped, "
-                .. "yshift=0.5\\energeseanchorpitch, fill=none, inner sep=0pt] {}",
-                edge.marker, edge.marker_magnitude or 1.0)
+                .. "yshift=%.3fcm, fill=none, inner sep=0pt] {}",
+                edge.marker, edge.marker_magnitude or 1.0, EXCHANGE_GAP / 2)
         end
 
         local label_code = marker_code
@@ -2591,10 +2610,27 @@ function energese.render(data, options)
         -- The ports this pathway was granted above. Each end holds one, so a
         -- second pathway wanting the same place got the next port along
         -- rather than being drawn on top of this one.
-        tex.print(string.format(
-            "\\energeserecallport{e%df}\\let\\energesefromport\\energeseportname"
-            .. "\\energeserecallport{e%dt}\\let\\energesetoport\\energeseportname",
-            edge_index, edge_index))
+        if edge.exchange_leg == "money" and goods_index[edge.exchange] then
+            -- Beside the goods' ports, EXCHANGE_GAP to the left of their
+            -- travel: at the buyer, the chord to the seller turned clockwise;
+            -- at the seller, the chord to the buyer turned anticlockwise.
+            local gi = goods_index[edge.exchange]
+            tex.print(string.format(
+                "\\energeserecallport{e%df}\\coordinate (energese-seller) at (\\energeseportname);"
+                .. "\\energeserecallport{e%dt}\\coordinate (energese-buyer) at (\\energeseportname);"
+                .. "\\coordinate (energese-money-from) at "
+                .. "($(energese-buyer)!%.3fcm!-90:(energese-seller)$);"
+                .. "\\coordinate (energese-money-to) at "
+                .. "($(energese-seller)!%.3fcm!90:(energese-buyer)$);"
+                .. "\\def\\energesefromport{energese-money-from}"
+                .. "\\def\\energesetoport{energese-money-to}",
+                gi, gi, EXCHANGE_GAP, EXCHANGE_GAP))
+        else
+            tex.print(string.format(
+                "\\energeserecallport{e%df}\\let\\energesefromport\\energeseportname"
+                .. "\\energeserecallport{e%dt}\\let\\energesetoport\\energeseportname",
+                edge_index, edge_index))
+        end
 
         if #waypoints > 0 then
             local pts = { { x_coords[from], y_coords[from] } }

@@ -8,7 +8,7 @@
     \esnode{sun}{source}   {Tr=1,    label={Sun}}
     \esnode{farm}{producer}{Tr=100,  label={Agriculture}}
     \esnode{town}{consumer}{Tr=2000, label={Consumer}}
-    \esnode{sale}{transaction}{seller=farm, buyer=town, money_label={\$}}
+    \esnode{sale}{transaction}{seller=farm, buyer=town, money_label={\$}, energy_label={food}}
     \esflow{sun}{farm}{energy}
 \end{energese}
 \end{document}

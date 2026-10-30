@@ -154,14 +154,6 @@
 
 \def\energeseportname{}
 
-% Which way round the ring a contested request steps: 1 anticlockwise, -1
-% clockwise, empty to let the allocator choose from where the other end lies.
-% The renderer sets it for the two legs of an exchange, whose money track must
-% take the port beside the goods on the same side at both ends -- left to
-% choose, the allocator steps up at one end and down at the other for a level
-% pair, and the tracks cross.
-\def\energeseportside{}
-
 \newcommand{\energesekeepport}[1]{%
     \expandafter\global\expandafter\let
         \csname energese@kept@#1\endcsname\energeseportname}
@@ -228,9 +220,6 @@
         {(sin(\energese@portangt - \energese@portanga) < 0) ? -1 : 1}%
     \energese@portN=\energese@portNv\relax
     \energese@portS=\energese@portSv\relax
-    \ifx\energeseportside\@empty\else
-        \energese@portS=\energeseportside\relax
-    \fi
     \energese@portD=\energese@portDv\relax
     \energese@portwrap\energese@portD
     \energese@portJ=0
