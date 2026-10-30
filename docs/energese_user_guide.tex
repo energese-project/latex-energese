@@ -2,7 +2,14 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{energese}
 \usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+\usepackage{graphicx}
+% Built from the repository root by `make docs`, or from docs/ by an editor.
+\graphicspath{{./}{../}}
 \usepackage{hyperref}
+% Long \verb names cannot hyphenate; let the spacing stretch instead.
+\setlength{\emergencystretch}{3em}
 
 \title{The \texttt{energese} Package User Guide}
 \date{}
@@ -96,17 +103,17 @@ front end is expressible in the other.
 
 \begin{verbatim}
 \begin{energese}
-    \esmeta{column_spacing=3.0, row_spacing=1.5, show_heat_sink=true}
+    \esmeta{column_spacing=3.4, row_spacing=1.5, show_heat_sink=true}
 
-    \esnode{sun}{source}         {Tr=1,    label={Sun}}
-    \esnode{grass}{producer}     {Tr=100,  label={Grass}}
-    \esnode{cow}{consumer}       {Tr=2000, label={Cow}}
-    \esnode{market}{transaction} {Tr=5000, label={Market}}
+    \esnode{sun}{source}      {Tr=1,     label={Sun}}
+    \esnode{grass}{producer}  {Tr=100,   label={Grass}}
+    \esnode{cow}{consumer}    {Tr=2000,  label={Cattle}}
+    \esnode{town}{consumer}   {Tr=10000, label={Town}}
+    \esnode{market}{transaction}{seller=cow, buyer=town,
+                                 energy_label={beef}, money_label={\$}}
 
     \esflow{sun}{grass}{energy}
     \esflow{grass}{cow}{energy}
-    \esflow{cow}{market}{energy}
-    \esflow{market}{grass}{money_feedback}
 \end{energese}
 \end{verbatim}
 
@@ -114,24 +121,24 @@ front end is expressible in the other.
 
 \begin{center}
 \begin{energese}
-    \esmeta{column_spacing=3.0, row_spacing=1.5, show_heat_sink=true}
+    \esmeta{column_spacing=3.4, row_spacing=1.5, show_heat_sink=true}
 
-    \esnode{sun}{source}         {Tr=1,    label={Sun}}
-    \esnode{grass}{producer}     {Tr=100,  label={Grass}}
-    \esnode{cow}{consumer}       {Tr=2000, label={Cow}}
-    \esnode{market}{transaction} {Tr=5000, label={Market}}
+    \esnode{sun}{source}      {Tr=1,     label={Sun}}
+    \esnode{grass}{producer}  {Tr=100,   label={Grass}}
+    \esnode{cow}{consumer}    {Tr=2000,  label={Cattle}}
+    \esnode{town}{consumer}   {Tr=10000, label={Town}}
+    \esnode{market}{transaction}{seller=cow, buyer=town,
+                                 energy_label={beef}, money_label={\$}}
 
     \esflow{sun}{grass}{energy}
     \esflow{grass}{cow}{energy}
-    \esflow{cow}{market}{energy}
-    \esflow{market}{grass}{money_feedback}
 \end{energese}
 \end{center}
 
 \noindent That is the same system as \texttt{examples/simple\_system.json}, and
 it rasterises identically --- the repository's test suite asserts as much.
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{ll}
 \toprule
@@ -176,71 +183,88 @@ automatic layout can be drawn by hand:
 
 \subsection{Nodes}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{lll}
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}>{\raggedright}p{0.3\textwidth} l p{0.52\textwidth}@{}}
 \toprule
 Key & Required & Meaning \\
 \midrule
 \texttt{id}             & yes & Unique identifier, referenced by edges. \\
-\texttt{type}           & yes & One of the types in section~\ref{sec:symbols}. \\
+\texttt{type}           & yes & One of the types in Section~\ref{sec:symbols}. \\
 \texttt{Tr}             & yes$^\dagger$ & Transformity; sets the column. \\
 \texttt{label}          & yes$^\dagger$ & Label text; \LaTeX{} is permitted. \\
 \texttt{short\_label}   & no  & Odum's nomenclature for the node: \texttt{Q1}, \texttt{X2}. \\
-\texttt{label\_position} & no  & \texttt{inside}, \texttt{above} or \texttt{below}. \\
-\texttt{seller}, \texttt{buyer} & no & On a \texttt{transaction}: makes it an exchange. \\
-\texttt{energy\_label}, \texttt{money\_label} & no & Captions for an exchange's two sides. \\
-\texttt{magnitude}      & no  & Scale factor for the symbol. Default \texttt{1.0}. \\
-\texttt{x}, \texttt{y}  & no  & Manual coordinates, overriding the layout. \\
+\texttt{label\_position} & no & \texttt{inside}, \texttt{above} or \texttt{below}. \\
 \texttt{label\_options} & no  & TikZ options applied to the node. \\
-\texttt{clearance\_w}, \texttt{clearance\_h} & no & Override the estimated
-extents used for routing. \\
-\texttt{inside}         & no  & Whether the system window encloses this node.
-Sources default to \texttt{false}, everything else to \texttt{true}. \\
-\texttt{parent}         & no  & On an \texttt{interaction} or
-\texttt{transaction}: the component to attach to. \\
-\texttt{parent\_dx}, \texttt{parent\_dy} & no & The offset from that parent,
-in diagram units. \\
-\texttt{attach}         & no  & \texttt{false} leaves a modifier in a column of
-its own. \\
+\texttt{magnitude}      & no  & Scale factor for the symbol, not its label. Default \texttt{1.0}. \\
+\texttt{x}, \texttt{y}  & no  & Manual coordinates, overriding the layout per axis. \\
+\texttt{layer\_hint}    & no  & \texttt{control} or \texttt{decomposition}: names the node's layer. \\
+\texttt{y\_gravity}     & no  & Nudges the node vertically, in diagram units. \\
+\texttt{notched}        & no  & On a \texttt{consumer}: draw it with an interaction notch. \\
+\texttt{inside}         & no  & Whether the system window encloses this node. Sources
+default to \texttt{false}, everything else to \texttt{true}. \\
+\texttt{points\_to}     & no  & On a \texttt{text} node: draw a dashed leader to that node. \\
+\texttt{clearance\_w}, \texttt{clearance\_h} & no & Override the estimated extents
+used for routing. \\
+\texttt{parent}, \texttt{parent\_dx}, \texttt{parent\_dy}, \texttt{attach} & no &
+On an \texttt{interaction} or \texttt{transaction}: the component it attaches
+to, the offset, or \texttt{attach=false} to keep it in a column of its own. \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{On an exchange (a \texttt{transaction} with a seller
+and a buyer)}} \\
+\texttt{seller}, \texttt{buyer} & yes & The two parties. \\
+\texttt{energy\_label}, \texttt{money\_label} & no & Captions for the two tracks. \\
+\texttt{energy\_label\_options}, \texttt{money\_label\_options} & no & Place a
+caption by hand. \\
+\texttt{options}, \texttt{waypoints} & no & Route the goods; the money follows. \\
 \bottomrule
 \end{tabular}
 \caption{Node keys. $\dagger$~not required for \texttt{text}, \texttt{box} or
-\texttt{ground} nodes, which carry no transformity.}
+\texttt{ground} nodes, or for an exchange, which carry no transformity.}
 \end{table}
 
 \subsection{Edges}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{lll}
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}>{\raggedright}p{0.3\textwidth} l p{0.52\textwidth}@{}}
 \toprule
 Key & Required & Meaning \\
 \midrule
 \texttt{from}, \texttt{to} & yes & Node identifiers. \\
 \texttt{type}              & yes & Pathway type; see below. \\
-\texttt{label}             & no  & Label text. \\
-\texttt{label\_options}    & no  & TikZ options for the label node. Supplying
-this places the label by hand; without it the label is placed automatically. \\
+\texttt{label}             & no  & The pathway's name ($J_0$). \\
+\texttt{quantity}          & no  & Its quantity (2~g/day), written on the other side. \\
+\texttt{label\_options}    & no  & TikZ options for the label. Supplying this places
+the label by hand; without it the label is placed automatically. \\
 \texttt{options}           & no  & TikZ options for the path, e.g.\ \texttt{bend left=20}. \\
-\texttt{volume}            & no  & Line width in points. Default \texttt{1.0}. \\
-\texttt{from\_anchor}, \texttt{to\_anchor} & no & Override the chosen anchors. \\
 \texttt{waypoints}         & no  & Explicit geometry; overrides automatic routing. \\
+\texttt{from\_anchor}, \texttt{to\_anchor} & no & Override the chosen anchors. \\
+\texttt{unused}            & no  & On a source's pathway: draw the unused-energy hook. \\
+\texttt{heat}              & no  & Take the sender's dissipation off this pathway. \\
+\texttt{volume}            & no  & Line width in points, to show relative flow. \\
 \bottomrule
 \end{tabular}
 \caption{Edge keys.}
 \end{table}
 
-Four pathway types are recognised. \texttt{energy} and \texttt{material} are
-solid arrows and both participate in the layout. \texttt{information} is a solid
-arrow. \texttt{money\_feedback} is dashed and, unless the edge routes itself,
-arcs over the top of the diagram --- money runs counter to energy, so it needs
-to stay clear of it.
+Five pathway types are recognised. \texttt{energy} and \texttt{material} are
+forward flows and take part in the layout; \texttt{material} is exempt from the
+rule that quality rises along a pathway (Section~\ref{sec:checks}).
+\texttt{information} is a solid arrow arriving on the receiver's top.
+\texttt{feedback} is a higher-quality component serving a lower one, and arcs
+back over the top into the receiver's top, as Odum draws a city's services
+returning to the industry that built it. \texttt{money\_feedback} is dashed and,
+unless the edge routes itself, arcs over the top too --- money runs counter to
+energy.
 
-Every pathway is drawn at \verb|\energeseflowwidth| with the same arrowhead,
-whether it ends at a symbol or at the ground: they are all flows, and drawing
-dissipation differently would imply it is something else. Set \texttt{volume} on
-an edge to widen it where the model wants to show relative flow.
+Odum draws three line weights, and the package follows him: pathways between
+components at \verb|\energeseflowwidth| (0.9\,pt); heat-sink pathways at about
+half that, \verb|\energeseheatwidth| (0.45\,pt), so used energy reads as the
+fine tracery under the working system; and the system window at about one and a
+half, \verb|\energeseframewidth| (1.35\,pt). The ratios are measured from his
+figures. Set \texttt{volume} on an edge to widen it where the model wants to
+show relative flow.
 
 Pathways are routed \emph{around} any symbol that is not their own endpoint. In
 ESL a line meeting a symbol denotes flow into it, so a pathway crossing an
@@ -258,26 +282,31 @@ pathways would say something weaker --- that a payment and a delivery both
 happened, not that they are the same transaction.
 
 Give a \texttt{transaction} node a \texttt{seller} and a \texttt{buyer} and the
-package draws all four half-pathways:
+package draws both sides:
 
 \begin{verbatim}
-\esnode{sale}{transaction}{Tr=5000, seller=agri, buyer=consumer,
+\esnode{sale}{transaction}{seller=agri, buyer=consumer,
                            money_label={\$}, energy_label={food}}
 \end{verbatim}
 
-The diamond is a \emph{marker on the pathway}, not a component the pathway
-enters: goods run from seller to buyer as one continuous line and the diamond
-rides it at the midpoint, rotated to the flow, with the line passing through the
-glyph. Every other symbol is routed around for the good reason that a line
-meeting a symbol denotes flow into it --- but an exchange annotates a coupling
-rather than transforming anything, so there is nothing to flow into. It
-accordingly carries no transformity and no heat sink.
+\noindent The goods run from seller to buyer as one pathway, routed like any
+other. The money runs back beside them, about 1.2\,mm to the left of the goods'
+direction of travel, following the same route, and both tracks pass through a
+small diamond centred between them --- goods through one half, money through the
+other --- as on Odum's symbol sheet. Each side's caption goes on its own
+outside. Track spacing and diamond size are measured from his figures.
 
-\noindent producing \texttt{seller} $\to$ diamond $\to$ \texttt{buyer} in energy,
-and \texttt{buyer} $\to$ diamond $\to$ \texttt{seller} in money. The legs are
-routed, checked and drawn like any other pathway, and run tightly parallel with
-the money just outside the goods, so that the pair reads as one transaction
-rather than as two pathways that happen to coincide.
+The diamond is a \emph{marker on the pathway}, not a component the pathway
+enters, so the lines cut straight through it, which every other symbol forbids.
+An exchange annotates a coupling and transforms nothing: it carries no
+transformity and no heat sink, and nothing may be anchored to it. A
+\texttt{transaction} used as an ordinary node --- energy flowing into it and
+stopping --- is not an exchange, and the energetic checks report it.
+
+Goods that run down the hierarchy, from a higher transformity to a lower, are a
+service fed back rather than a forward flow, and are drawn and checked as
+\texttt{feedback}. \texttt{options} or \texttt{waypoints} on the exchange route
+its goods, and the money follows.
 
 \subsection{Geometry from the model}
 
@@ -301,6 +330,8 @@ drawn; one carrying none is laid out from scratch.
 \subsection{Metadata}
 
 \texttt{column\_spacing} and \texttt{row\_spacing} tune the layout grid;
+\texttt{label\_mode} chooses which names appear (Section~\ref{sec:labels});
+\texttt{strict} turns the energetic checks into errors;
 \texttt{show\_heat\_sink} (default true) draws the dissipation pathways and
 their common ground; \texttt{heat\_sink\_label}, \texttt{heat\_sink\_y} and
 \texttt{ground\_x} position and name it; \texttt{system\_boundary} draws one or more enclosing
@@ -316,6 +347,7 @@ overrides that with \texttt{inside}. \texttt{boundary\_margin} sets the margin
 in diagram units.
 
 \section{Labels}
+\label{sec:labels}
 
 Odum names symbols as well as describing them: storages $Q_1, Q_2, \ldots$,
 sources and flows $X$ and $J$. Both belong in the model --- the short name is
@@ -324,7 +356,7 @@ may carry \texttt{label} (the friendly name) and \texttt{short\_label} (Odum's).
 
 \texttt{label\_mode} in the metadata chooses between them:
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{lll}
 \toprule
@@ -381,7 +413,7 @@ The vertical axis is not arbitrary either. It carries the same quality ordering
 as the horizontal, applied \emph{relative to the main chain}, so the energy
 hierarchy runs from bottom-left to top-right.
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{ll}
 \toprule
@@ -439,6 +471,130 @@ downward --- the vertical convention --- and converges on a ground placed by
 neither rule. Three node types are annotations or terminators rather than
 components and are exempt from carrying transformity: \texttt{ground},
 \texttt{text} and \texttt{box}.
+
+\subsection{Sources sit around the system}
+
+A source is an input from outside, and Odum places sources around the outside of
+the system in order of transformity: the lowest-quality on the left, the rest
+over the top, the most concentrated on the right, flowing in leftwards. The
+layout does the same. A source of higher transformity than every component goes
+on the right; one that is a second input to what it feeds, or of higher
+transformity than the lowest component, goes over the top of what it feeds; any
+other sits on the left, level with what it feeds. Sources on the top and right
+take no column of their own. An explicit \texttt{x} or \texttt{y} keeps a source
+where it is put.
+
+\subsection{A second input comes from above}
+
+The symbol sheet draws the interaction, the producer, the consumer and the box
+with their main input on the left and a second one arriving from above, and
+Odum's diagrams keep to it. Of a component's forward inflows, the one from the
+lowest-transformity sender enters on the left and each other enters at the top,
+unless its edge names an anchor.
+
+\subsection{An interaction feeding a consumer is its notch}
+
+Where a consumer's inflows combine, Odum draws the interaction as a notch in the
+consumer's own left side rather than as a separate symbol. An unlabelled
+interaction whose forward flow goes to a single consumer is folded into it: the
+consumer is drawn notched and its inflows meet at the notch. A labelled
+interaction, one placed with \texttt{x}/\texttt{y}, or one with
+\texttt{attach=false} stays a symbol; \texttt{notched} on a consumer asks for
+the notch directly.
+
+\section{Following Odum's figures}
+\label{sec:odum}
+
+Each convention the package draws is taken from Odum's own figures, and
+\texttt{docs/odum-conventions.md} in the repository lists them with the
+measurements behind them. Here are the ones most easily got wrong, each with a
+crop of Odum's figure on the left and the package's drawing on the right. The
+same drawings are the repository's regression tests.
+
+\newcommand{\conv}[3]{%
+  \parbox[c]{0.44\textwidth}{\centering\includegraphics[height=#3]{#1}}%
+  \hfill
+  \parbox[c]{0.52\textwidth}{\centering #2}\par\medskip}
+
+\paragraph{Exchange.} Goods and money on paired, opposed tracks through one
+small diamond.
+
+\conv{docs/conventions/C05-exchange-pair.png}{%
+\begin{energese}[scale=0.8]
+    \esmeta{column_spacing=4.2, row_spacing=1.5, show_heat_sink=false}
+    \esnode{farm}{producer}{Tr=100,  label={Agriculture}}
+    \esnode{town}{consumer}{Tr=2000, label={Consumer}}
+    \esnode{sale}{transaction}{seller=farm, buyer=town, money_label={\$}}
+\end{energese}}{3cm}
+
+\paragraph{Unused energy.} The part of a renewable inflow that reaches the
+system and leaves unused hooks back out where the pathway crosses the frame
+(\texttt{unused}).
+
+\conv{docs/conventions/C04-unused-loop-a.png}{%
+\begin{energese}[scale=0.8]
+    \esmeta{column_spacing=3.4, row_spacing=1.5, system_boundary, show_heat_sink=false}
+    \esnode{sun}{source}   {Tr=1,  label={Sun}}
+    \esnode{farm}{producer}{Tr=10, label={Agriculture}}
+    \esflow{sun}{farm}{energy}{unused}
+\end{energese}}{2.6cm}
+
+\paragraph{Notched consumer.} The interaction drawn in the consumer's own side,
+its inflows meeting at the notch.
+
+\conv{docs/conventions/C06-notched-consumer.png}{%
+\begin{energese}[scale=0.8]
+    \esmeta{column_spacing=3.4, row_spacing=1.6, show_heat_sink=false}
+    \esnode{sun}{source}    {Tr=1,    label={Sun}}
+    \esnode{farm}{producer} {Tr=10,   label={Agriculture}}
+    \esnode{fuel}{source}   {Tr=1000, label={Fuels}}
+    \esnode{ix}{interaction}{Tr=500,  label={}}
+    \esnode{pop}{consumer}  {Tr=2000, label={Population}}
+    \esflow{sun}{farm}{energy}
+    \esflow{farm}{ix}{energy}
+    \esflow{fuel}{ix}{energy}
+    \esflow{ix}{pop}{energy}
+\end{energese}}{2.6cm}
+
+\paragraph{Heat taken off a pathway.} A storage's depreciation as a branch off
+its outflow, marked at the junction (\texttt{heat}).
+
+\conv{docs/conventions/C03-heat-off-pathway.png}{%
+\begin{energese}[scale=0.8]
+    \esmeta{column_spacing=3.4, row_spacing=1.2}
+    \esnode{src}{source}{Tr=1,  label={}}
+    \esnode{q}{storage} {Tr=10, label={$Q$}}
+    \esnode{out}{text}  {x=6.8, y=0, label={}}
+    \esflow{src}{q}{energy}{label={$J_0$}}
+    \esflow{q}{out}{energy}{label={$J = kQ$}, heat}
+\end{energese}}{2.6cm}
+
+\paragraph{Feedback.} A higher-quality component serving a lower one, arcing over
+into its top.
+
+\conv{docs/conventions/C08-feedback-from-above.png}{%
+\begin{energese}[scale=0.8]
+    \esmeta{column_spacing=3.4, row_spacing=1.6, show_heat_sink=false}
+    \esnode{ind}{misc}    {Tr=100,  label={Industry}}
+    \esnode{sky}{storage} {Tr=2000, label={Highways,\\Dams}}
+    \esflow{ind}{sky}{energy}
+    \esflow{sky}{ind}{feedback}
+\end{energese}}{2.6cm}
+
+\paragraph{Used energy and the ground.} Thin heat pathways merging inside the
+frame, one line leaving it, and one large arrowhead resting on the ground.
+
+\conv{docs/conventions/C02-heat-convergence.png}{%
+\begin{energese}[scale=0.8]
+    \esmeta{column_spacing=2.6, row_spacing=1.5, system_boundary}
+    \esnode{sun}{source}    {Tr=1,    label={Sun}}
+    \esnode{farm}{producer} {Tr=10,   label={Farms}}
+    \esnode{grain}{storage} {Tr=100,  label={Grain}}
+    \esnode{pop}{consumer}  {Tr=1000, label={People}}
+    \esflow{sun}{farm}{energy}
+    \esflow{farm}{grain}{energy}
+    \esflow{grain}{pop}{energy}
+\end{energese}}{2.6cm}
 
 \section{Reading a GSSK model}
 
@@ -522,21 +678,20 @@ diagram.} The package renders faithfully and does not repair.
 
 \section{Layout}
 
-Horizontal position comes from transformity. The distinct \texttt{Tr} values in
-the diagram are sorted and each is assigned a column, so position reflects
-energy quality rather than the order nodes were declared. Columns are
-\texttt{column\_spacing} apart.
-
-Vertical position comes from the central spine method. The longest chain of
-energy and material pathways is found and laid on the axis; everything else is
-distributed above and below its column's spine at multiples of
-\texttt{row\_spacing}. A node's \texttt{layer\_hint} (\texttt{control} or
-\texttt{decomposition}) nudges it one row up or down, and \texttt{y\_gravity}
-shifts it by an arbitrary amount.
+Horizontal position comes from transformity: the distinct \texttt{Tr} values of
+the components are sorted and each is given a column, \texttt{column\_spacing}
+apart (Section~\ref{sec:conventions}). Vertical position comes from the role a
+component plays relative to the main chain of \texttt{energy} pathways, rows
+\texttt{row\_spacing} apart. Sources go around the outside, a component's second
+input comes from above, and an interaction feeding a consumer becomes its notch,
+all as described there.
 
 Giving a node explicit \texttt{x} or \texttt{y} overrides the computed value for
 that axis alone, so a single stubborn component can be placed by hand without
-abandoning the layout for the rest.
+abandoning the layout for the rest. A figure that must follow an original
+exactly --- the worked example in Section~\ref{sec:worked} --- is best traced:
+every position measured from the original, so its composition is the author's
+and not the layout engine's.
 
 \subsection{Modifiers travel with what they modify}
 
@@ -574,18 +729,27 @@ may be nowhere clear, and the least obstructed position is used. Supplying
 \section{Symbols, anchors and ports}
 \label{sec:symbols}
 
+The symbols, drawn bare as on Odum's sheet (\texttt{reference-images/complete-odum-symbols.png}),
+with the type that draws each:
+
+\newcommand{\sym}[2]{\begin{tabular}[b]{@{}c@{}}
+  \begin{tikzpicture}[baseline=(s.south)]#1\end{tikzpicture}\\[2pt]
+  \footnotesize #2\end{tabular}}
 \begin{center}
-\begin{tikzpicture}[node distance=1.1cm]
-    \node[energese source]                            (a) {Source};
-    \node[energese storage, right=of a]               (b) {Storage};
-    \node[energese producer, right=of b]              (c) {Producer};
-    \node[energese consumer, below=1.1cm of a]        (d) {Consumer};
-    \node[energese transaction, right=of d]           (e) {Transaction};
-    \node[energese interaction, right=of e]           (f) {Interaction};
-    \node[energese gain, below=1.1cm of d]            (g) {G};
-    \node[energese loop_limited, right=of g]          (h) {Loop};
-    \node[energese switch, right=of h]                (i) {Switch};
-\end{tikzpicture}
+\begin{tabular}{cccc}
+\sym{\node[energese source] (s) {};}{\texttt{source}} &
+\sym{\node[energese storage] (s) {};}{\texttt{storage}} &
+\sym{\node[energese producer] (s) {};}{\texttt{producer}} &
+\sym{\node[energese consumer] (s) {};}{\texttt{consumer}} \\[10pt]
+\sym{\node[energese consumer, shape=energese notched consumer] (s) {};}{\texttt{consumer}, \texttt{notched}} &
+\sym{\node[energese interaction] (s) {};}{\texttt{interaction}} &
+\sym{\node[energese misc] (s) {};}{\texttt{misc}} &
+\sym{\node[energese gain] (s) {};}{\texttt{gain}} \\[10pt]
+\sym{\node[energese loop_limited] (s) {};}{\texttt{loop\_limited}} &
+\sym{\node[energese switch] (s) {};}{\texttt{switch}} &
+\sym{\node[energese transaction, energese magnitude=0.6] (s) {};}{\texttt{transaction}} &
+\sym{\draw[energese ground arrow] (0,0.9) -- (0,0); \node[energese ground] (s) at (0,0) {};}{heat sink}
+\end{tabular}
 \end{center}
 
 Every symbol sizes itself to its label, growing its outline around the text so
@@ -597,8 +761,10 @@ Each flow symbol carries the anchors \texttt{energy\_in}, \texttt{energy\_out},
 \texttt{heat\_sink}, in addition to \texttt{center}, \texttt{north},
 \texttt{south}, \texttt{east} and \texttt{west}. \texttt{feedback\_out} is
 defined on every symbol except \texttt{source} and \texttt{interaction}. Energy
-enters on the left and leaves on the right; money moves through the upper half;
-dissipation leaves through \texttt{heat\_sink} at the bottom.
+enters on the left and leaves on the right; a second input, a control or a
+feedback arrives through \texttt{feedback\_in} on top; money moves through the
+upper half; dissipation leaves through \texttt{heat\_sink} at the bottom. On a
+notched consumer \texttt{energy\_in} is the notch.
 
 \subsection{Ports}
 \label{sec:ports}
@@ -651,17 +817,22 @@ dropping the pathway. \texttt{box}, \texttt{text} and \texttt{ground} have no
 ring, and pathways meet them at the named anchor.
 
 \texttt{gain} is the constant-gain amplifier, \texttt{loop\_limited} the
-loop-limited converter and \texttt{switch} the on/off switching action. Because
-a triangle is a poor container for text, label a \texttt{gain} with a single
-character as Odum does; a long label there will overflow the apex.
+loop-limited converter, \texttt{switch} the on/off switching action and
+\texttt{misc} Odum's miscellaneous box, for a process with no symbol of its own.
+Because a triangle is a poor container for text, label a \texttt{gain} with a
+single character as Odum does; a long label there will overflow the apex.
 
 Three further node types are plain TikZ rather than Odum symbols:
-\texttt{box} (a rectangle), \texttt{text} (an unboxed label, useful as a routing
-waypoint) and \texttt{ground} (the heat-sink terminator glyph).
+\texttt{box} (a rectangle, for an equation or a note; it does not dissipate),
+\texttt{text} (an unboxed label, useful as a routing waypoint, and the node a
+\texttt{points\_to} leader starts from) and \texttt{ground} (the heat-sink
+terminator glyph).
 
 Symbol outlines are drawn at \verb|\energeselinewidth|, which defaults to
 $0.9$\,pt to match the constant pen weight measured in Odum's published sheet.
-Redefine it with \verb|\setlength| for a heavier or lighter house style.
+Redefine it, \verb|\energeseflowwidth|, \verb|\energeseheatwidth| or
+\verb|\energeseframewidth| with \verb|\setlength| for a heavier or lighter house
+style.
 
 Every symbol holds its shape. A shape has a canonical aspect ratio measured from
 Odum's sheet, and it keeps that ratio at every size: a symbol grows uniformly to
@@ -697,10 +868,19 @@ symbol. Dissipation is flow to a common sink, not contact with a surface, so
 there is no horizontal floor line.
 
 The dissipating types are \texttt{producer}, \texttt{consumer},
-\texttt{storage}, \texttt{transaction}, \texttt{gain},
-\texttt{loop\_limited} and \texttt{switch}. Sources and interactions dissipate
-nothing in Odum's convention, and \texttt{text}, \texttt{box} and
-\texttt{ground} are plain shapes with no \texttt{heat\_sink} anchor.
+\texttt{storage}, \texttt{interaction}, \texttt{misc}, \texttt{gain},
+\texttt{loop\_limited} and \texttt{switch} --- the symbols Odum's sheet draws
+with a heat sink. Sources and exchanges dissipate nothing, and \texttt{text},
+\texttt{box} and \texttt{ground} are plain shapes with no \texttt{heat\_sink}
+anchor.
+
+A component's dissipation may instead be taken off one of its pathways, as Odum
+draws a storage's depreciation as a branch off its outflow: \texttt{heat} on the
+edge draws the branch from the middle of the pathway, marked at the junction by
+a small filled triangle, and the component then runs no heat pathway of its own.
+
+The bundle ends in one large filled arrowhead resting on the ground's top bar,
+as in Odum's figures; \texttt{heat\_sink\_label} writes the total beside it.
 
 Where a system window is drawn, the dissipation pathways converge just inside it
 and a single line crosses the frame to reach the ground outside. Each pathway
@@ -709,7 +889,9 @@ what leaves the system is one aggregate flow of used energy, not several.
 
 \texttt{system\_boundary} draws an optional \emph{system window}: the frame
 declaring what the model treats as inside the system, and therefore what its
-macro-level inputs and outputs are. The ground symbol is always placed
+macro-level inputs and outputs are. Its \texttt{label} --- usually the units of
+the diagram's quantities --- is written under the frame's bottom-left corner, as
+Odum writes ``$10^{15}$ Calories per Year''. The ground symbol is always placed
 \emph{outside} that window --- used energy leaves the system, so its terminator
 cannot sit within the frame. A \texttt{heat\_sink\_y} that would put the ground
 inside the window is overridden rather than honoured.
@@ -721,13 +903,23 @@ too little is deepened to make it, with a warning giving the new
 \texttt{y\_min}. Copy that value into the model to silence it.
 
 \section{A worked example}
+\label{sec:worked}
 
-\texttt{examples/aggregated-economy.json} reproduces a classic Odum figure. It
-exercises manual coordinates, a system boundary, a relocated heat sink and
-several money-feedback arcs:
+\texttt{examples/aggregated-economy.json} reproduces Odum's aggregated economy.
+It is traced: every position in it was measured from his figure, reproduced
+below beside it, so the composition is his rather than the layout engine's. It
+exercises a system window, notched consumers, four exchanges --- one of them
+the human service fed back to industry over the top of the whole system --- the
+Sun's unused-energy hooks, quantities on pathways, and the heat-sink total.
 
 \begin{center}
-\renderEnergese{examples/aggregated-economy.json}
+\includegraphics[width=0.75\textwidth]{reference-images/aggregated-economy.png}\par
+\footnotesize Odum's figure (\texttt{reference-images/aggregated-economy.png})
+\end{center}
+
+\begin{center}
+\renderEnergese{examples/aggregated-economy.json}\par
+\footnotesize \texttt{\textbackslash renderEnergese\{examples/aggregated-economy.json\}}
 \end{center}
 
 \end{document}

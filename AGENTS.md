@@ -248,6 +248,45 @@ consumer. The model overrides all of it: explicit `x`/`y` is never touched,
 `parent` names the component, `parent_dx`/`parent_dy` set the offset, and
 `attach=false` opts out.
 
+**Odum's conventions are a checklist, and each has a fixture.**
+`docs/odum-conventions.md` lists every drawing convention the package follows,
+each with a crop of the Odum figure it was taken from (`docs/conventions/`) and
+the measurement behind it. `tests/conventions/` holds one small drawing per
+item, golden-tracked as `conv-*`; `make conventions` sets each beside its crop
+(`tests/fidelity/out/conventions-sheet.png`) for a person to judge. Changing how
+something is drawn starts there: amend the item, change its fixture, and look at
+the sheet. Judge a change against the crop, not against the previous render.
+
+The rules the engine applies on its own, all from that list:
+
+- **Sources sit around the frame** (C07, `energese.source_sides`): right if of
+  higher transformity than every component; top if every flow they send is a
+  second input, or of higher transformity than the lowest component; otherwise
+  left, level with what they feed if alone in their column. Top and right
+  sources take no column.
+- **A second input comes from above** (C15, `energese.assign_input_sides`): the
+  main input is the flow from a component of highest transformity below the
+  receiver's, failing that the lowest-quality source; only an input of *higher*
+  quality than the main one takes `feedback_in`. Equal inputs, and a
+  low-quality bypass, stay on the left -- `diagram-port-contention` and
+  `diagram-obstacle-routing` caught the first, cruder rule.
+- **An interaction feeding a consumer is its notch** (C06,
+  `energese.fold_interactions`): an unlabelled, unplaced interaction whose
+  forward flow goes to one consumer is folded into it, every pathway that met it
+  redirected, exchanges included.
+- **Dissipation can come off a pathway** (C03, `heat` on an edge), and **the
+  unused part of a renewable inflow hooks back out** at the frame (C04,
+  `unused`). Both anchor to a `coordinate[pos=...]` on the drawn curve, so a
+  label added to that edge must be appended to the path's code, not replace it.
+- **An exchange is two tracks** (C05): the money is the goods' route run back
+  `EXCHANGE_GAP` to its left, its ends offset from the goods' ports with TikZ
+  `calc`; it takes no ring ports, which are a pitch apart along the outline and
+  land far off on a corner. Goods running down the hierarchy are `feedback`.
+
+A worked example that reproduces one of Odum's figures is traced (C21): every
+position measured from the figure, so its composition is his. Automatic layout
+is judged on its own fixtures, not on reproducing his hand composition.
+
 **Dissipation converges as a delta.** A tributary's lane is *how far it drops*
 before turning in, assigned by reach: the component nearest the trunk turns in
 highest, the furthest lowest, so the further one runs below and outside the

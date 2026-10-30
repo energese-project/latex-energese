@@ -523,8 +523,8 @@ end
 -- a second coming in from above, and Odum's diagrams keep to it: the bulk,
 -- lower-quality flow arrives from the left, a higher-quality one -- fuel, a
 -- control -- comes down onto the top. So of a component's forward inflows, the
--- one from the lowest-transformity sender (the first declared, on a tie) keeps
--- the left, and each other takes the top, unless its edge names an anchor. A
+-- main one keeps the left, and each of higher quality takes the top, unless its
+-- edge names an anchor. A
 -- notched consumer takes every inflow at its notch, and a storage, being a
 -- tank, takes them wherever they come from.
 local TAKES_INPUT_FROM_ABOVE = {
@@ -543,16 +543,34 @@ function energese.assign_input_sides(data)
             table.insert(inflows[edge.to], edge)
         end
     end
-    for _, list in pairs(inflows) do
+    for to_id, list in pairs(inflows) do
         if #list > 1 then
-            local main = list[1]
+            -- The main input is the flow along the chain: from a component,
+            -- the one of highest transformity below the receiver's. Failing
+            -- one, it is the lowest-quality source. Only an input of higher
+            -- quality than the main one comes from above -- equal inputs stay
+            -- on the left, and a low-quality bypass is not a control.
+            local own = node_map[to_id].Tr or math.huge
+            local main
             for _, edge in ipairs(list) do
-                local tr = (node_map[edge.from] or {}).Tr or math.huge
-                local best = (node_map[main.from] or {}).Tr or math.huge
-                if tr < best then main = edge end
+                local from = node_map[edge.from] or {}
+                if from.type ~= "source" and from.Tr and from.Tr < own
+                    and (not main or from.Tr > node_map[main.from].Tr) then
+                    main = edge
+                end
             end
+            if not main then
+                for _, edge in ipairs(list) do
+                    local tr = (node_map[edge.from] or {}).Tr or math.huge
+                    if not main or tr < ((node_map[main.from] or {}).Tr or math.huge) then
+                        main = edge
+                    end
+                end
+            end
+            local main_tr = (node_map[main.from] or {}).Tr or 0
             for _, edge in ipairs(list) do
-                if edge ~= main and not edge.to_anchor then
+                local tr = (node_map[edge.from] or {}).Tr or 0
+                if edge ~= main and tr > main_tr and not edge.to_anchor then
                     edge.to_anchor = "feedback_in"
                 end
             end
@@ -578,12 +596,19 @@ function energese.source_sides(nodes, edges)
             max_tr = math.max(max_tr or node.Tr, node.Tr)
         end
     end
-    local secondary = {}
+    -- A second input only if every flow it sends is one: the Sun feeding a
+    -- producer as its main input and something else on the side stays left.
+    local secondary, main_input = {}, {}
     for _, edge in ipairs(edges) do
-        if FORWARD_FLOW[edge.type] and edge.to_anchor == "feedback_in" then
-            secondary[edge.from] = true
+        if FORWARD_FLOW[edge.type] then
+            if edge.to_anchor == "feedback_in" then
+                secondary[edge.from] = true
+            else
+                main_input[edge.from] = true
+            end
         end
     end
+    for id in pairs(main_input) do secondary[id] = nil end
     local side = {}
     for _, node in ipairs(nodes) do
         if node.type == "source" and node.Tr and node.x == nil and node.y == nil
@@ -617,11 +642,21 @@ function energese.place_perimeter_sources(nodes, edges, side, x_coords, y_coords
         end
     end
     if not top_y then return end
+    local shared_column = {}
+    for _, node in ipairs(nodes) do
+        if side[node.id] == "left" and x_coords[node.id] then
+            local x = x_coords[node.id]
+            shared_column[x] = (shared_column[x] or 0) + 1
+        end
+    end
     local groups, order = {}, {}
     for _, node in ipairs(nodes) do
         local s = side[node.id]
-        if s == "left" then
+        if s == "left" and shared_column[x_coords[node.id]] == 1 then
             -- Level with what it feeds: the bulk inflow runs straight in.
+            -- Only a source alone in its column: several sharing one keep the
+            -- rows the layout fanned them into, or they would be drawn on top
+            -- of each other.
             local sy, n = 0, 0
             for _, edge in ipairs(edges) do
                 if edge.from == node.id and FORWARD_FLOW[edge.type] and y_coords[edge.to] then
