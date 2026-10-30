@@ -440,6 +440,213 @@ function energese.expand_exchanges(data)
     return #added
 end
 
+-- An interaction feeding a consumer is drawn as the consumer's notch (C06):
+-- Odum puts the interaction in the consumer's own left side -- Population,
+-- Industry -- and not beside it as a separate symbol. An unlabelled interaction
+-- whose forward flow goes to a single consumer is folded into it: the consumer
+-- is marked `notched`, every pathway that met the interaction meets the
+-- consumer instead (its inflows at the notch), and the interaction and its
+-- pathway into the consumer go. A labelled interaction was named by its
+-- author, an interaction placed by hand was placed, and one with attach=false
+-- was kept apart on purpose; each of those stays a symbol.
+function energese.fold_interactions(data)
+    local node_map = {}
+    for _, node in ipairs(data.nodes) do node_map[node.id] = node end
+    local folded = {}
+    for _, ix in ipairs(data.nodes) do
+        if ix.type == "interaction" and (ix.label == nil or ix.label == "")
+            and ix.attach ~= false and ix.x == nil and ix.y == nil then
+            local target, other_out
+            for _, edge in ipairs(data.edges) do
+                if edge.from == ix.id and FORWARD_FLOW[edge.type] then
+                    local to = node_map[edge.to]
+                    if to and to.type == "consumer" and (target == nil or target == to.id) then
+                        target = to.id
+                    else
+                        other_out = true
+                    end
+                end
+            end
+            if target and not other_out then folded[ix.id] = target end
+        end
+    end
+    if next(folded) == nil then return 0 end
+
+    local edges = {}
+    for _, edge in ipairs(data.edges) do
+        local into = folded[edge.from]
+        if not (into and edge.to == into and FORWARD_FLOW[edge.type]) then
+            if folded[edge.to] then
+                edge.to = folded[edge.to]
+                if FORWARD_FLOW[edge.type] and not edge.to_anchor then
+                    edge.to_anchor = "energy_in"
+                end
+            end
+            if folded[edge.from] then edge.from = folded[edge.from] end
+            edges[#edges + 1] = edge
+        end
+    end
+    data.edges = edges
+    local nodes, count = {}, 0
+    for _, node in ipairs(data.nodes) do
+        if folded[node.id] then
+            count = count + 1
+        else
+            if node.seller and folded[node.seller] then node.seller = folded[node.seller] end
+            if node.buyer and folded[node.buyer] then node.buyer = folded[node.buyer] end
+            nodes[#nodes + 1] = node
+        end
+    end
+    for _, target in pairs(folded) do node_map[target].notched = true end
+    data.nodes = nodes
+    return count
+end
+
+-- Where a second input enters (C15). The symbol sheet draws the interaction,
+-- the producer, the consumer and the box with their main input on the left and
+-- a second coming in from above, and Odum's diagrams keep to it: the bulk,
+-- lower-quality flow arrives from the left, a higher-quality one -- fuel, a
+-- control -- comes down onto the top. So of a component's forward inflows, the
+-- one from the lowest-transformity sender (the first declared, on a tie) keeps
+-- the left, and each other takes the top, unless its edge names an anchor. A
+-- notched consumer takes every inflow at its notch, and a storage, being a
+-- tank, takes them wherever they come from.
+local TAKES_INPUT_FROM_ABOVE = {
+    interaction = true, producer = true, consumer = true, misc = true,
+    gain = true, loop_limited = true, switch = true,
+}
+function energese.assign_input_sides(data)
+    local node_map = {}
+    for _, node in ipairs(data.nodes) do node_map[node.id] = node end
+    local inflows = {}
+    for _, edge in ipairs(data.edges) do
+        local to = node_map[edge.to]
+        if FORWARD_FLOW[edge.type] and not edge.exchange_leg and to
+            and TAKES_INPUT_FROM_ABOVE[to.type] and not to.notched then
+            inflows[edge.to] = inflows[edge.to] or {}
+            table.insert(inflows[edge.to], edge)
+        end
+    end
+    for _, list in pairs(inflows) do
+        if #list > 1 then
+            local main = list[1]
+            for _, edge in ipairs(list) do
+                local tr = (node_map[edge.from] or {}).Tr or math.huge
+                local best = (node_map[main.from] or {}).Tr or math.huge
+                if tr < best then main = edge end
+            end
+            for _, edge in ipairs(list) do
+                if edge ~= main and not edge.to_anchor then
+                    edge.to_anchor = "feedback_in"
+                end
+            end
+        end
+    end
+end
+
+-- Sources sit around the outside of the system (C07): Odum puts the
+-- lowest-quality source on the left, runs the rest over the top in order of
+-- transformity, and puts the most concentrated on the right, flowing in
+-- leftwards (Renewable Sources, then Fuels and Materials, then Other Nations).
+-- Which side a source takes:
+--   right  -- of higher transformity than every component;
+--   top    -- a second input to what it feeds (assign_input_sides), or of
+--             higher transformity than the lowest component;
+--   left   -- otherwise: the bulk, low-quality inflow, on the axis it feeds.
+-- A source with an explicit x or y keeps its place and takes no side.
+function energese.source_sides(nodes, edges)
+    local min_tr, max_tr
+    for _, node in ipairs(nodes) do
+        if node.type ~= "source" and node.Tr and not (node.seller and node.buyer) then
+            min_tr = math.min(min_tr or node.Tr, node.Tr)
+            max_tr = math.max(max_tr or node.Tr, node.Tr)
+        end
+    end
+    local secondary = {}
+    for _, edge in ipairs(edges) do
+        if FORWARD_FLOW[edge.type] and edge.to_anchor == "feedback_in" then
+            secondary[edge.from] = true
+        end
+    end
+    local side = {}
+    for _, node in ipairs(nodes) do
+        if node.type == "source" and node.Tr and node.x == nil and node.y == nil
+            and min_tr then
+            if node.Tr > max_tr then
+                side[node.id] = "right"
+            elseif secondary[node.id] or node.Tr > min_tr then
+                side[node.id] = "top"
+            else
+                side[node.id] = "left"
+            end
+        end
+    end
+    return side
+end
+
+-- Sources placed against what they feed, once the components are laid out:
+-- a left source level with it; a top source over it, clear of everything
+-- inside; a right source beyond the last column, level with it. Sources over
+-- one component share the space over it.
+function energese.place_perimeter_sources(nodes, edges, side, x_coords, y_coords,
+                                         col_spacing, row_spacing)
+    local node_map = {}
+    for _, node in ipairs(nodes) do node_map[node.id] = node end
+    local top_y, right_x
+    for _, node in ipairs(nodes) do
+        if node.type ~= "source" and x_coords[node.id] and not (node.seller and node.buyer) then
+            local hw, hh = energese.half_extent(node)
+            top_y = math.max(top_y or -1e9, y_coords[node.id] + hh)
+            right_x = math.max(right_x or -1e9, x_coords[node.id] + hw)
+        end
+    end
+    if not top_y then return end
+    local groups, order = {}, {}
+    for _, node in ipairs(nodes) do
+        local s = side[node.id]
+        if s == "left" then
+            -- Level with what it feeds: the bulk inflow runs straight in.
+            local sy, n = 0, 0
+            for _, edge in ipairs(edges) do
+                if edge.from == node.id and FORWARD_FLOW[edge.type] and y_coords[edge.to] then
+                    sy, n = sy + y_coords[edge.to], n + 1
+                end
+            end
+            if n > 0 then y_coords[node.id] = sy / n end
+        elseif s == "top" or s == "right" then
+            local sx, sy, n = 0, 0, 0
+            for _, edge in ipairs(edges) do
+                if edge.from == node.id and x_coords[edge.to] then
+                    sx, sy, n = sx + x_coords[edge.to], sy + y_coords[edge.to], n + 1
+                end
+            end
+            if n > 0 then
+                local hw, hh = energese.half_extent(node)
+                if s == "right" then
+                    x_coords[node.id] = right_x + 0.6 * col_spacing + hw
+                    y_coords[node.id] = sy / n
+                else
+                    local key = string.format("%.3f", sx / n)
+                    if not groups[key] then groups[key] = { x = sx / n }; order[#order + 1] = key end
+                    table.insert(groups[key], { id = node.id, hw = hw, hh = hh })
+                end
+            end
+        end
+    end
+    for _, key in ipairs(order) do
+        local g = groups[key]
+        local total = 0
+        for _, m in ipairs(g) do total = total + 2 * m.hw end
+        total = total + 0.3 * (#g - 1)
+        local x = g.x - total / 2
+        for _, m in ipairs(g) do
+            x_coords[m.id] = x + m.hw
+            y_coords[m.id] = top_y + 0.9 * row_spacing + m.hh
+            x = x + 2 * m.hw + 0.3
+        end
+    end
+end
+
 function energese.check_energetics(data)
     local findings = {}
     local function report(fmt, ...)
@@ -676,6 +883,8 @@ function energese.half_extent(node)
     local dimy = labelled and (label_half_height(node.label) + INNER_SEP) or 0
 
     local fit, floor = FIT[node.type], CIRCLE_FLOOR[node.type]
+    -- The notched consumer's label keeps right of its notch (energese-shapes).
+    if node.type == "consumer" and node.notched then fit = { 0.877, 0.85, 0.46 } end
     if fit then
         local R, fx, fy = fit[1], fit[2], fit[3]
         local outh = math.max(hh, dimx / (fx * R), dimy / fy)
@@ -2200,7 +2409,9 @@ function energese.render(data, options)
 
     -- Expand before anything looks at the edges, so the synthesised legs are
     -- checked, routed and drawn exactly like declared ones.
+    energese.fold_interactions(data)
     energese.expand_exchanges(data)
+    energese.assign_input_sides(data)
 
     local findings = energese.check_energetics(data)
     if #findings > 0 then
@@ -2224,11 +2435,22 @@ function energese.render(data, options)
     -- from what is left.
     local attached = energese.attach_modifiers(data.nodes, data.edges, col_spacing)
 
-    local tr_map = energese.calculate_transformity_columns(data.nodes, attached)
+    -- Sources on the top and right take no column: they sit against what
+    -- they feed, and a column of their own spaced the components apart
+    -- around an empty slot.
+    local source_side = energese.source_sides(data.nodes, data.edges)
+    local no_column = {}
+    for id, a in pairs(attached) do no_column[id] = a end
+    for id, s in pairs(source_side) do
+        if s ~= "left" then no_column[id] = true end
+    end
+    local tr_map = energese.calculate_transformity_columns(data.nodes, no_column)
     local x_coords = energese.calculate_x_coordinates(data.nodes, tr_map, col_spacing)
     local y_coords = energese.calculate_vertical_positions(data.nodes, data.edges,
         tr_map, row_spacing, attached)
     energese.place_attached(attached, x_coords, y_coords)
+    energese.place_perimeter_sources(data.nodes, data.edges, source_side,
+        x_coords, y_coords, col_spacing, row_spacing)
 
     local node_map = {}
     for _, node in ipairs(data.nodes) do
@@ -2288,6 +2510,7 @@ function energese.render(data, options)
             -- carrying the same words came out in different type sizes.
             local style = string.format("energese %s, energese magnitude=%f",
                 node.type, magnitude)
+            if node.notched then style = style .. ", shape=energese notched consumer" end
             tex.print(string.format("\\node[%s] (%s) at (%f, %f) %s {%s};",
                 style, node.id, x_coords[node.id], y_coords[node.id],
                 lopts ~= "" and "[" .. lopts .. "]" or "", placement[node.id].inside))
