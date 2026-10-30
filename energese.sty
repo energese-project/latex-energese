@@ -35,10 +35,22 @@
 \newlength{\energeseunit}
 \setlength{\energeseunit}{1.1cm}
 
-% One width for every pathway, whatever it carries and wherever it goes. An
-% edge may still override it per flow through the model's `volume' key.
+% One width for every flow between components, whatever it carries. An edge
+% may still override it per flow through the model's `volume' key.
 \newlength{\energeseflowwidth}
 \setlength{\energeseflowwidth}{0.9pt}
+
+% Odum draws three weights, not one, and they are measured, not chosen: across
+% modern-civilisation.png and pyramids-as-organisers.png (144 DPI, summed ink
+% across the stroke, good to about 0.3 px) a pathway is 2.4--2.6 px, a heat-sink
+% pathway 1.0--1.6 px and the system frame 3.6--4.3 px. Used energy is drawn
+% at about half a flow, so the dissipation reads as the fine tracery under the
+% working system that it is in his figures; the frame at about one and a half,
+% so the boundary reads as the boundary and not as one more pathway.
+\newlength{\energeseheatwidth}
+\setlength{\energeseheatwidth}{0.45pt}
+\newlength{\energeseframewidth}
+\setlength{\energeseframewidth}{1.35pt}
 
 % Labels sit inside the symbols, so they want to be smaller than body text.
 \newcommand{\energeselabelfont}{\sffamily\footnotesize}
@@ -62,6 +74,7 @@
     energese loop_limited/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese loop_limited, minimum height=0.855\energeseunit, minimum width=0.645\energeseunit, align=center, fill=white, font=\energeselabelfont},
     energese switch/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese switch, minimum height=0.645\energeseunit, minimum width=0.645\energeseunit, align=center, fill=white, font=\energeselabelfont},
     energese ground/.style={draw=none, line width=\energeselinewidth, shape=energese ground, fill=none},
+    energese misc/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese misc, minimum height=0.95\energeseunit, minimum width=1.55\energeseunit, align=center, fill=white, font=\energeselabelfont},
     energese box/.style={draw, line width=\energeselinewidth, shape=rectangle, align=center, fill=white, font=\energeselabelfont},
     energese text/.style={align=center, font=\energeselabelfont},
     % Edge styles
@@ -72,10 +85,23 @@
     % sets its own bend and blows the arc up into a full circle.
     energese money_feedback/.style={->, dashed, black, line width=\energeseflowwidth},
     energese information/.style={->, solid, black, line width=\energeseflowwidth},
-    % Dissipation pathways carry the same weight as energy pathways.
-    % Dissipation pathways converge on a single ground, so they carry no head
-    % of their own -- one flow, one arrowhead, at the terminator.
-    energese heat/.style={-, solid, black, line width=\energeseflowwidth}
+    % Feedback: a higher-quality component serving a lower one, drawn as Odum
+    % draws it -- a pathway arcing back over the top into the receiver.
+    energese feedback/.style={->, solid, black, line width=\energeseflowwidth},
+    % Dissipation pathways are drawn at the heat-sink weight (see above), and
+    % converge on a single ground, so they carry no head of their own -- one
+    % flow, one arrowhead, at the terminator.
+    energese heat/.style={-, solid, black, line width=\energeseheatwidth},
+    % The single arrowhead of the dissipation bundle, resting on the ground's
+    % top bar: Odum's is large and filled, 3.9 by 3.2 mm (energese-shapes.tex).
+    energese ground arrow/.style={-{Triangle[length=3.2mm, width=3.9mm]},
+        solid, black, line width=\energeseheatwidth},
+    % A note's leader to what it names: thin, finely dashed, small head.
+    energese leader/.style={-{Triangle[length=1.6mm, width=1.2mm]},
+        dash pattern=on 1.5pt off 1.5pt, black, line width=\energeseheatwidth,
+        shorten >=1pt, shorten <=2pt},
+    % The system window.
+    energese frame/.style={draw, black, line width=\energeseframewidth}
 }
 
 %% -------------------------------------------------------------------------

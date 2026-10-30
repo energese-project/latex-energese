@@ -4,22 +4,12 @@
 \usepackage{energese}
 \begin{document}
 \begin{energese}[background rectangle/.style={fill={rgb,255:red,237;green,237;blue,234}}, show background rectangle]
-    \esmeta{column_spacing=3.0, row_spacing=1.5, show_heat_sink=false}
-
-    \esnode{src}{source} {Tr=1,   x=1.0, y=3.6, magnitude=0.9}
-    \esnode{st}{storage} {Tr=100, x=3.8, y=3.6, magnitude=1.2,
-                          label={Q}, label_options={inner sep=1pt, font=\sffamily\large}}
-    \esnode{sink}{text}  {x=6.8, y=1.8}
-    \esnode{gnd}{ground} {x=5.4, y=0.5}
-    \esnode{branch}{text}{x=5.4, y=2.5}
-    \esnode{eq_box}{box} {x=3.4, y=0.8, magnitude=1.3, label={$\dot{Q} = J_0 - kQ$}}
-
-    \esflow{src}{st}{energy}       {volume=0.5, label={$J_0$},
-                                    label_options={midway, above, inner sep=5pt}}
-    \esflow{st}{branch}{energy}    {volume=0.5, label={$kQ$},
-                                    label_options={midway, above, inner sep=3pt},
-                                    options={bend left=20, -}}
-    \esflow{branch}{sink}{energy}  {volume=0.5, options={->}}
-    \esflow{branch}{gnd}{energy}   {volume=0.5, options={-}}
+    \esmeta{row_spacing=1.0, heat_sink_y=-1.75}
+    \esnode{src}{source}{Tr=1,   x=0.0,  y=0.0,   magnitude=1.3, label={}}
+    \esnode{st}{storage}{Tr=100, x=3.37, y=-0.25, magnitude=1.7, label={$Q$}}
+    \esnode{out}{text}  {x=5.8,  y=-1.31, label={}}
+    \esnode{eq_box}{box}{x=1.65, y=-1.78, label={$\dot{Q} = J_0 - kQ$}}
+    \esflow{src}{st}{energy}{label={$J_0$}, options={bend left=0}}
+    \esflow{st}{out}{energy}{label={$kQ$}, options={bend left=20}, heat}
 \end{energese}
 \end{document}

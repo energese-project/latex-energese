@@ -1,0 +1,18 @@
+% C06: an interaction feeding a consumer is drawn as the consumer's notch.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=3.4, row_spacing=1.6}
+    \esnode{sun}{source}       {Tr=1,    label={Sun}}
+    \esnode{fuel}{source}      {Tr=1000, label={Fuels}}
+    \esnode{farm}{producer}    {Tr=10,   label={Agriculture}}
+    \esnode{ix}{interaction}   {Tr=500,  label={}}
+    \esnode{pop}{consumer}     {Tr=2000, label={Population}}
+    \esflow{sun}{farm}{energy}
+    \esflow{farm}{ix}{energy}
+    \esflow{fuel}{ix}{energy}
+    \esflow{ix}{pop}{energy}
+\end{energese}
+\end{document}

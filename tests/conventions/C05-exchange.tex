@@ -1,0 +1,14 @@
+% C05: an exchange -- goods and money as opposed paired tracks through one small diamond.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=4.2, row_spacing=1.5}
+    \esnode{sun}{source}   {Tr=1,    label={Sun}}
+    \esnode{farm}{producer}{Tr=100,  label={Agriculture}}
+    \esnode{town}{consumer}{Tr=2000, label={Consumer}}
+    \esnode{sale}{transaction}{seller=farm, buyer=town, money_label={\$}, energy_label={food}}
+    \esflow{sun}{farm}{energy}
+\end{energese}
+\end{document}

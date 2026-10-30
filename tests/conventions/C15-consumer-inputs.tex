@@ -1,0 +1,16 @@
+% C15: a consumer's main input on the left, a second input onto its upper slope.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=3.2, row_spacing=1.6}
+    \esnode{sun}{source}   {Tr=1,    label={Sun}}
+    \esnode{fuel}{source}  {Tr=1000, label={Fuels}}
+    \esnode{farm}{producer}{Tr=10,   label={Farms}}
+    \esnode{pop}{consumer} {Tr=2000, label={People}}
+    \esflow{sun}{farm}{energy}
+    \esflow{farm}{pop}{energy}
+    \esflow{fuel}{pop}{energy}
+\end{energese}
+\end{document}

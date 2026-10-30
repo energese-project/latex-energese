@@ -55,17 +55,17 @@ produces the same output as `make`.
 \usepackage{energese}
 
 \begin{energese}
-    \esmeta{column_spacing=3.0, row_spacing=1.5}
+    \esmeta{column_spacing=3.4, row_spacing=1.5}
 
-    \esnode{sun}{source}         {Tr=1,    label={Sun}}
-    \esnode{grass}{producer}     {Tr=100,  label={Grass}}
-    \esnode{cow}{consumer}       {Tr=2000, label={Cow}}
-    \esnode{market}{transaction} {Tr=5000, label={Market}}
+    \esnode{sun}{source}      {Tr=1,     label={Sun}}
+    \esnode{grass}{producer}  {Tr=100,   label={Grass}}
+    \esnode{cow}{consumer}    {Tr=2000,  label={Cattle}}
+    \esnode{town}{consumer}   {Tr=10000, label={Town}}
+    \esnode{market}{transaction}{seller=cow, buyer=town,
+                                 energy_label={beef}, money_label={\$}}
 
     \esflow{sun}{grass}{energy}
     \esflow{grass}{cow}{energy}
-    \esflow{cow}{market}{energy}
-    \esflow{market}{grass}{money_feedback}
 \end{energese}
 ```
 
@@ -94,14 +94,15 @@ produce identical output; the third bypasses both.
 
 | Object | Keys |
 | --- | --- |
-| Node | `id`, `type`, `Tr`, `label`, `short_label`, `magnitude`, `x`, `y`, `inside`, `parent`, `label_options` |
-| Edge | `from`, `to`, `type`, `label`, `volume`, `options`, `waypoints`, `from_anchor`, `to_anchor` |
+| Node | `id`, `type`, `Tr`, `label`, `short_label`, `magnitude`, `x`, `y`, `inside`, `parent`, `label_options`, `notched`, `points_to`; on an exchange `seller`, `buyer`, `energy_label`, `money_label` |
+| Edge | `from`, `to`, `type`, `label`, `quantity`, `volume`, `options`, `waypoints`, `from_anchor`, `to_anchor`, `unused`, `heat` |
 | Metadata | `column_spacing`, `row_spacing`, `system_boundary`, `boundary_margin`, `heat_sink_label`, `ground_x`, `label_mode`, `strict` |
 
 Node types are Odum's symbols: `source`, `producer`, `consumer`, `storage`,
-`interaction`, `transaction`, `gain`, `loop_limited`, `switch`, plus `text`,
-`box` and `ground`. Pathway types are `energy`, `material`, `money_feedback`
-and `information`. The [user guide](docs/energese_user_guide.pdf) is the full
+`interaction`, `transaction`, `gain`, `loop_limited`, `switch`, `misc`, plus
+`text`, `box` and `ground`. Pathway types are `energy`, `material`, `feedback`,
+`money_feedback` and `information`. The drawing conventions, each taken from
+Odum's own figures, are listed in [docs/odum-conventions.md](docs/odum-conventions.md). The [user guide](docs/energese_user_guide.pdf) is the full
 reference.
 
 ### 2. A model in TeX

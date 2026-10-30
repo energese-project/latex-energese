@@ -149,8 +149,9 @@ chasing it wastes effort.
 The reference images in `reference-images/` are **144 DPI screen captures of
 printed figures**. Individual symbols on `complete-odum-symbols.png` measure
 between 45 and 96 pixels tall. At that resolution a circle's radius is
-recoverable to about ±1 px — roughly 1.5–3% — and line weight, curve control
-points and stroke joins are not recoverable at all. The captures also carry
+recoverable to about ±1 px — roughly 1.5–3% — and absolute line weight, curve
+control points and stroke joins are not recoverable at all. (The *ratio* of two
+line weights in one figure is: see the three line weights in §6.) The captures also carry
 scanner artifacts, slight skew, and in `aggregated-economy.png` visible
 show-through from the reverse of the page.
 
@@ -246,6 +247,45 @@ fixed fraction of the column buried a labelled diamond's left vertex inside its
 consumer. The model overrides all of it: explicit `x`/`y` is never touched,
 `parent` names the component, `parent_dx`/`parent_dy` set the offset, and
 `attach=false` opts out.
+
+**Odum's conventions are a checklist, and each has a fixture.**
+`docs/odum-conventions.md` lists every drawing convention the package follows,
+each with a crop of the Odum figure it was taken from (`docs/conventions/`) and
+the measurement behind it. `tests/conventions/` holds one small drawing per
+item, golden-tracked as `conv-*`; `make conventions` sets each beside its crop
+(`tests/fidelity/out/conventions-sheet.png`) for a person to judge. Changing how
+something is drawn starts there: amend the item, change its fixture, and look at
+the sheet. Judge a change against the crop, not against the previous render.
+
+The rules the engine applies on its own, all from that list:
+
+- **Sources sit around the frame** (C07, `energese.source_sides`): right if of
+  higher transformity than every component; top if every flow they send is a
+  second input, or of higher transformity than the lowest component; otherwise
+  left, level with what they feed if alone in their column. Top and right
+  sources take no column.
+- **A second input comes from above** (C15, `energese.assign_input_sides`): the
+  main input is the flow from a component of highest transformity below the
+  receiver's, failing that the lowest-quality source; only an input of *higher*
+  quality than the main one takes `feedback_in`. Equal inputs, and a
+  low-quality bypass, stay on the left -- `diagram-port-contention` and
+  `diagram-obstacle-routing` caught the first, cruder rule.
+- **An interaction feeding a consumer is its notch** (C06,
+  `energese.fold_interactions`): an unlabelled, unplaced interaction whose
+  forward flow goes to one consumer is folded into it, every pathway that met it
+  redirected, exchanges included.
+- **Dissipation can come off a pathway** (C03, `heat` on an edge), and **the
+  unused part of a renewable inflow hooks back out** at the frame (C04,
+  `unused`). Both anchor to a `coordinate[pos=...]` on the drawn curve, so a
+  label added to that edge must be appended to the path's code, not replace it.
+- **An exchange is two tracks** (C05): the money is the goods' route run back
+  `EXCHANGE_GAP` to its left, its ends offset from the goods' ports with TikZ
+  `calc`; it takes no ring ports, which are a pitch apart along the outline and
+  land far off on a corner. Goods running down the hierarchy are `feedback`.
+
+A worked example that reproduces one of Odum's figures is traced (C21): every
+position measured from the figure, so its composition is his. Automatic layout
+is judged on its own fixtures, not on reproducing his hand composition.
 
 **Dissipation converges as a delta.** A tributary's lane is *how far it drops*
 before turning in, assigned by reach: the component nearest the trunk turns in
@@ -607,9 +647,9 @@ Implemented so far:
 | `source` | Circle | no |
 | `storage` | Circle with a flattened, peaked top | yes |
 | `producer` | Rectangle closed by a semicircle on the **right** | yes |
-| `consumer` | Hexagon, pointed **left and right** | yes |
-| `transaction` | Diamond (Odum's "exchange") | yes |
-| `interaction` | Pointed right, notched left | no |
+| `consumer` | Hexagon, pointed **top and bottom** | yes |
+| `transaction` | Diamond (Odum's "exchange") | no |
+| `interaction` | Pointed right, notched left | yes |
 | `gain` | Right-pointing triangle (constant-gain amplifier) | yes |
 | `loop_limited` | Rectangle whose right side bows outward | yes |
 | `switch` | Square with all four sides bowed inward | yes |
@@ -617,9 +657,14 @@ Implemented so far:
 | `text` | Unboxed label; routing waypoint | no |
 | `ground` | Fixed-size heat-sink terminator glyph | n/a |
 
-Sources and interactions carry no heat sink by Odum's convention. `text`, `box`
-and `ground` are plain TikZ shapes with no `heat_sink` anchor at all — asking
-for one is a hard TeX error, so `energese.HAS_HEAT_SINK` gates it.
+Sources and transactions carry no heat sink by Odum's convention — the exchange
+diamond marks a transaction between two components and transforms nothing, so
+it has nothing to dissipate. The interaction *does* dissipate: the symbol sheet
+draws its heat sink, and `strong-source.png` runs used energy down from the
+work transformation. (This file used to say otherwise; see
+`docs/odum-conventions.md` C12.) `text`, `box` and
+`ground` are plain TikZ shapes with no `heat_sink` anchor at all — asking for
+one is a hard TeX error. `energese.DISSIPATES` is the set that does dissipate.
 
 All of Odum's flow symbols are implemented. `reference-images/crop-harvest.png`
 additionally uses sensor and valve glyphs that do not appear on the canonical
@@ -764,11 +809,18 @@ is the westmost point the symbol actually has. The same applies to anything the 
 anchor: the heat-sink drop is measured from the symbol's underside, not its
 centre, because a drop shorter than the half-height ran back up inside the glyph.
 
-**All pathways look alike.** One width (`\energeseflowwidth`) and one arrowhead,
-whether the pathway ends at a symbol or at the ground — they are all flows, and
-drawing dissipation differently implies it is something else. The arrowhead is
-`Triangle`, not `Stealth`: Odum's pen drew a blunt solid head. `volume` on an
-edge is the one sanctioned override, for showing relative flow.
+**Three line weights, measured.** This file used to say all pathways look
+alike, on the argument that drawing dissipation differently implies it is
+something else. Odum's figures say otherwise, and the figures are the
+reference. Summing the ink across each stroke in `modern-civilisation.png` and
+`pyramids-as-organisers.png` (good to about 0.3 px at 144 DPI): a pathway between
+components is 2.4–2.6 px, a heat-sink pathway 1.0–1.6 px, the system frame
+3.6–4.3 px. So `\energeseflowwidth` (0.9pt) for flows, `\energeseheatwidth`
+(0.45pt, about half) for dissipation, and `\energeseframewidth` (1.35pt, about
+one and a half) for the window. An absolute width is not recoverable from a
+capture, but a ratio between strokes of the same figure is: both share the scan.
+The arrowhead is `Triangle`, not `Stealth`: Odum's pen drew a blunt solid head.
+`volume` on an edge is the one sanctioned override, for showing relative flow.
 
 **Labels.** A node carries `label` (friendly) and `short_label` (Odum's
 nomenclature — Q for storages, X and J for sources and flows), and

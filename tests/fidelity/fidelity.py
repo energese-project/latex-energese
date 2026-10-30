@@ -71,6 +71,13 @@ DIAGRAMS = ["source-store", "simple_system", "aggregated-economy",
             "source-store-native", "simple_system-native",
             "aggregated-economy-native"]
 
+# One small drawing per item of docs/odum-conventions.md, each a standalone
+# document in tests/conventions/ named after its item (C05-exchange.tex). They
+# are golden-tracked like any render, and `conventions` sets each beside the
+# crop of Odum's figure that the item was taken from, for a person to judge.
+CONVENTIONS = os.path.join(ROOT, "tests", "conventions")
+CROPS = os.path.join(ROOT, "docs", "conventions")
+
 # Diagrams built for the harness rather than shipped as examples, each
 # exercising something the examples do not.
 FIXTURES = {
@@ -262,7 +269,12 @@ def cmd_render(args):
         print(("  ok   " if ok else "  FAIL ") + "diagram-" + diagram)
         if not ok:
             failures.append((diagram, err))
-    for jobname, source in sorted(FIXTURES.items()):
+    conventions = {}
+    if os.path.isdir(CONVENTIONS):
+        for f in sorted(os.listdir(CONVENTIONS)):
+            if f.endswith(".tex"):
+                conventions["conv-" + f[:-4]] = open(os.path.join(CONVENTIONS, f)).read()
+    for jobname, source in sorted(list(FIXTURES.items()) + list(conventions.items())):
         ok, err = render_one(args.lualatex, args.pdftoppm, jobname, source)
         print(("  ok   " if ok else "  FAIL ") + jobname)
         if not ok:
@@ -275,7 +287,7 @@ def cmd_render(args):
 # Only actual renders are golden-tracked. The contact sheet and the
 # side-by-side panels are assembled *from* those renders, so tracking them adds
 # no coverage and lets a stale derived image be promoted as if it were output.
-RENDER_PREFIXES = ("symbol-", "diagram-")
+RENDER_PREFIXES = ("symbol-", "diagram-", "conv-")
 
 # Derived review images, never golden-tracked: contact sheet tiles, comparison
 # panels and overlays are all assembled from renders that are tracked already.
@@ -598,11 +610,50 @@ def cmd_sheet(args):
     return 0
 
 
+def cmd_conventions(args):
+    """Each convention's render beside the reference crop it must follow."""
+    from PIL import Image, ImageDraw
+    renders = sorted(f for f in os.listdir(OUT)
+                     if f.startswith("conv-") and f.endswith(".png")) if os.path.isdir(OUT) else []
+    if not renders:
+        print("no convention renders found -- run `make conventions`, which renders first")
+        return 1
+    crops = sorted(os.listdir(CROPS)) if os.path.isdir(CROPS) else []
+    H, pad, rows = 260, 16, []
+    for render in renders:
+        item = render[len("conv-"):].split("-")[0]          # e.g. C05
+        refs = [c for c in crops if c.startswith(item + "-")]
+        tiles = [Image.open(os.path.join(CROPS, c)).convert("RGB") for c in refs]
+        tiles.append(Image.open(os.path.join(OUT, render)).convert("RGB"))
+        tiles = [t.resize((max(1, int(t.width * H / t.height)), H)) for t in tiles]
+        row = Image.new("RGB", (sum(t.width for t in tiles) + pad * (len(tiles) + 1),
+                                H + 30), "white")
+        d = ImageDraw.Draw(row)
+        d.text((pad, 4), "%s   reference: %s   |   render: %s"
+               % (item, ", ".join(refs) or "none", render), fill="black")
+        x = pad
+        for t in tiles:
+            row.paste(t, (x, 26))
+            x += t.width + pad
+        rows.append(row)
+    W = max(r.width for r in rows)
+    sheet = Image.new("RGB", (W, sum(r.height for r in rows)), "white")
+    y = 0
+    for r in rows:
+        sheet.paste(r, (0, y))
+        y += r.height
+    dest = os.path.join(OUT, "conventions-sheet.png")
+    sheet.save(dest)
+    print("Conventions sheet: %s (%d items)" % (dest, len(rows)))
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=["render", "regression", "accept",
-                                        "conformance", "sheet", "compare", "fonts", "overlay"])
+                                        "conformance", "sheet", "compare", "fonts", "overlay",
+                                        "conventions"])
     ap.add_argument("--lualatex", default=os.environ.get("LUALATEX", "lualatex"))
     ap.add_argument("--pdftoppm", default=os.environ.get("PDFTOPPM", "pdftoppm"))
     ap.add_argument("--pdffonts", default=os.environ.get("PDFFONTS", "pdffonts"))
@@ -610,7 +661,8 @@ def main():
     return {"render": cmd_render, "regression": cmd_regression, "accept": cmd_accept,
             "conformance": cmd_conformance, "sheet": cmd_sheet,
             "compare": cmd_compare, "fonts": cmd_fonts,
-            "overlay": cmd_overlay}[args.command](args)
+            "overlay": cmd_overlay,
+            "conventions": cmd_conventions}[args.command](args)
 
 
 if __name__ == "__main__":

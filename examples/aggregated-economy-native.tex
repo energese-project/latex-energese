@@ -1,43 +1,45 @@
 % The aggregated-economy model authored in TeX rather than JSON. This is the
 % same system as examples/aggregated-economy.json and renders identically --
-% `make parity` asserts it. It is the complex counterpart to the simple
-% source-store and simple_system pairs: manual coordinates, a system window, a
-% relocated heat sink, interaction symbols, and several money-feedback arcs.
+% `make parity` asserts it.
+%
+% Traced from reference-images/aggregated-economy.png: every position is
+% measured from Odum's figure (0.0146 units per pixel, origin at the Sun's
+% centre), so the composition is his rather than the layout engine's
+% (docs/odum-conventions.md, C21).
 \documentclass{standalone}
 \usepackage{energese}
 \begin{document}
 \begin{energese}
-    \esmeta{heat_sink_label={11,297.6}, ground_x=7.44, heat_sink_y=-6.28}
-    \esboundary{x_min=1.3, x_max=14.01, y_min=-4.78, y_max=3.72,
+    \esmeta{row_spacing=1.2, heat_sink_label={11,297.6}, ground_x=7.49, heat_sink_y=-3.8}
+    \esboundary{x_min=1.68, x_max=13.75, y_min=-3.47, y_max=4.53,
                 label={$10^{15}$ Calories per Year}}
 
-    \esnode{sun}{source}       {Tr=1,     x=0, y=0,  magnitude=1.5, label={Sun}}
-    \esnode{fuels}{source}     {Tr=1000,  x=8.18, y=4.96,  label={Fuels,\\Minerals}}
-    \esnode{env_systems}{producer}{Tr=10, x=2.6, y=0.62,  label={Environmental\\Systems}}
-    \esnode{agri}{producer}    {Tr=10,    x=5.21, y=-1.86, label={Agriculture}}
-    % Interaction symbols: where separate inflows must combine before they can
-    % be used. Odum draws these as the notched shapes abutting each consumer.
-    \esnode{ix_industry}{interaction}{Tr=1000,  x=6.45, y=1.24}
-    \esnode{industry}{consumer}{Tr=2000,  x=8.18, y=1.24,  magnitude=1.5, label={Industry}}
-    \esnode{consumer}{consumer}{Tr=10000, x=12.15, y=-0.62, label={Consumer\\Human Service}}
-    % Exchanges: goods one way, money the other, coupled at a diamond.
-    \esnode{ex_ic}{transaction}{seller=industry,
-                                buyer=consumer, money_label={\$ $1.1 \times 10^{12}$}}
-    \esnode{ex_ai}{transaction}{seller=agri,
-                                buyer=ix_industry, money_label={\$}}
-    \esnode{ex_ac}{transaction}{seller=agri,
-                                buyer=consumer, money_label={\$}}
-    \esnode{human_service_label}{text}{x=12.15, y=3.41,   label={Human Service}}
-    % Energy reaching the source but not used by the system: Odum draws it as a
-    % branch that leaves without driving anything.
-    \esnode{unused}{text}{x=0.74, y=-2.11}
+    \esnode{sun}{source}           {Tr=1,     x=0.0,  y=0.0,  magnitude=1.8, label={Sun}}
+    \esnode{fuels}{source}         {Tr=1000,  x=8.35, y=5.84, label={Fuels,\\Minerals}}
+    \esnode{env_systems}{producer} {Tr=10,    x=3.37, y=0.93, label={Environmental\\Systems}}
+    \esnode{agri}{producer}        {Tr=10,    x=6.26, y=-1.01, label={Agriculture}}
+    % Industry and the consumers combine their inflows in an interaction, which
+    % Odum draws as a notch in the consumer's own side.
+    \esnode{industry}{consumer}    {Tr=2000,  x=8.7,  y=2.01, magnitude=1.5, notched,
+                                    label={Industry}}
+    \esnode{consumer}{consumer}    {Tr=10000, x=11.65, y=0.15, notched,
+                                    label={Consumer\\Human\\Service}}
+    \esnode{human_service_label}{text}{x=12.0, y=4.12, label={Human Service}}
+    \esnode{human_service_money}{text}{x=9.2,  y=3.72, label={\$ $1.1 \times 10^{12}$}}
+    % Exchanges: goods one way, money the other, on paired tracks.
+    \esnode{ex_ai}{transaction}{seller=agri, buyer=industry, money_label={\$}}
+    \esnode{ex_ac}{transaction}{seller=agri, buyer=consumer, money_label={\$},
+        money_label_options={pos=0.45, above=3pt, inner sep=2pt, font=\energeselabelfont}}
+    \esnode{ex_ic}{transaction}{seller=industry, buyer=consumer, money_label={\$}}
+    % Human service, fed back to industry over the top of the system.
+    \esnode{ex_ci}{transaction}{seller=consumer, buyer=industry,
+        waypoints={12.96,1.46; 12.26,3.21; 10.66,4.02; 8.61,4.2; 7.45,3.65}}
 
-    \esflow{sun}{env_systems}{energy}   {label={6000}, options={bend left=20}}
-    \esflow{sun}{agri}{energy}          {label={5280}, options={bend right=20}}
-    \esflow{sun}{unused}{energy}        {options={bend left=25}}
-    \esflow{fuels}{ix_industry}{energy} {label={17.6}, from_anchor=south,
-                                         to_anchor=feedback_in}
-    \esflow{env_systems}{ix_industry}{energy}{options={bend left=8}}
-    \esflow{ix_industry}{industry}{energy}
+    \esflow{sun}{env_systems}{energy}{label={6000}, options={bend left=20}, unused}
+    \esflow{sun}{agri}{energy}       {label={5280}, options={bend right=10}, unused}
+    \esflow{fuels}{industry}{energy} {label={17.6}, from_anchor=south,
+        label_options={pos=0.62, left=3pt, inner sep=2pt, font=\energeselabelfont}}
+    \esflow{env_systems}{industry}{energy}
+    \esflow{env_systems}{consumer}{energy}
 \end{energese}
 \end{document}

@@ -540,6 +540,54 @@
 }
 
 %% -------------------------------------------------------------------------
+%% Miscellaneous box -- Odum's rectangle for a process with no symbol of its own.
+%% -------------------------------------------------------------------------
+% Measured from reference-images/complete-odum-symbols.png: 98 by 60 px between
+% outline centres, an aspect of 1.63, and the same height as the sheet's
+% producer (60 against 63 px). Energy in on the left and out on the right, a
+% second input onto the top, heat sink below -- the sheet draws all four. Text
+% may fill it, as it may a producer's body.
+\def\energese@msc@rad{%
+    \pgfmathsetmacro{\es@a}{\energese@msc@w}%
+    \pgfmathsetmacro{\es@b}{\energese@msc@h}%
+    \pgfmathsetmacro{\es@rr}{min(\es@a/max(0.05,abs(cos(\es@th))),
+                                 \es@b/max(0.05,abs(sin(\es@th))))}%
+}
+\pgfdeclareshape{energese misc}{
+    \saveddimen\energese@msc@w{\energese@fit{1.63}{1.0}{1.0}\pgf@x=\energese@outw}
+    \saveddimen\energese@msc@h{\energese@fit{1.63}{1.0}{1.0}\pgf@x=\energese@outh}
+    \savedanchor\energese@msc@ne{\energese@fit{1.63}{1.0}{1.0}%
+        \pgf@x=\energese@outw \pgf@y=\energese@outh}
+    \anchor{center}{\pgfpointorigin}
+    \anchor{text}{\energese@textanchor}
+    \anchor{north}{\pgfpoint{0pt}{\energese@msc@h}}
+    \anchor{south}{\pgfpoint{0pt}{-\energese@msc@h}}
+    \anchor{east}{\pgfpoint{\energese@msc@w}{0pt}}
+    \anchor{west}{\pgfpoint{-\energese@msc@w}{0pt}}
+    \anchor{energy_in}{\pgfpoint{-\energese@msc@w}{0pt}}
+    \anchor{energy_out}{\pgfpoint{\energese@msc@w}{0pt}}
+    \anchor{money_in}{\pgfmathsetmacro{\es@a}{\energese@msc@w}%
+        \pgfpoint{0.6*\es@a pt}{\energese@msc@h}}
+    \anchor{money_out}{\pgfmathsetmacro{\es@a}{\energese@msc@w}%
+        \pgfpoint{-0.6*\es@a pt}{\energese@msc@h}}
+    \anchor{feedback_in}{\pgfmathsetmacro{\es@a}{\energese@msc@w}%
+        \pgfpoint{0.3*\es@a pt}{\energese@msc@h}}
+    \anchor{feedback_out}{\pgfmathsetmacro{\es@a}{\energese@msc@w}%
+        \pgfpoint{-0.3*\es@a pt}{\energese@msc@h}}
+    \anchor{heat_sink}{\pgfpoint{0pt}{-\energese@msc@h}}
+    \energese@ring{\energese@msc@h}{\energese@msc@rad}
+    \anchorborder{%
+        \pgf@xa=\pgf@x\pgf@ya=\pgf@y%
+        \pgf@process{\energese@msc@ne}%
+        \pgfpointborderrectangle{\pgfqpoint{\pgf@xa}{\pgf@ya}}{\pgfqpoint{\pgf@x}{\pgf@y}}%
+    }
+    \backgroundpath{
+        \pgfpathrectanglecorners{\pgfpoint{-\energese@msc@w}{-\energese@msc@h}}
+                                {\pgfpoint{\energese@msc@w}{\energese@msc@h}}
+    }
+}
+
+%% -------------------------------------------------------------------------
 %% Consumer -- a hexagon, pointed top and bottom, with vertical sides.
 %% -------------------------------------------------------------------------
 % Measured from reference-images/complete-odum-symbols.png by flood-filling the
@@ -605,6 +653,89 @@
         \pgfpathlineto{\pgfpoint{\es@w pt}{-\es@sh pt}}
         \pgfpathlineto{\pgfpoint{0pt}{-\es@h pt}}
         \pgfpathlineto{\pgfpoint{-\es@w pt}{-\es@sh pt}}
+        \pgfpathlineto{\pgfpoint{-\es@w pt}{\es@sh pt}}
+        \pgfpathclose
+    }
+}
+
+%% -------------------------------------------------------------------------
+%% Notched consumer -- a consumer whose inflows combine in an interaction.
+%% -------------------------------------------------------------------------
+% Odum draws the interaction as a notch in the consumer's own left side
+% (Population in modern-civilisation.png, Industry and Consumer in
+% aggregated-economy.png), not as a separate symbol beside it. Measured on
+% Population, good to a few pixels since its lettering crowds the notch: a
+% chevron in the middle of the left side, about 0.4 of the shoulder height
+% high and 0.3 of the half-width deep. The inflows meet at its apex, which is
+% where energy_in is.
+% The notch takes 0.3 of the half-width out of the left side, where the label
+% would otherwise run; Odum moves the lettering right of it, and so does this:
+% the label may use 0.85 of the width and sits 0.15 of the half-width right of
+% centre, so it spans from the notch's apex to the right-hand side.
+\def\energese@ncn@fit{\energese@fit{0.877}{0.85}{0.46}}
+\def\energese@ncn@rad{%
+    \pgfmathsetmacro{\es@W}{\energese@ncn@w}%
+    \pgfmathsetmacro{\es@H}{\energese@ncn@h}%
+    \pgfmathsetmacro{\es@rr}{1/max(abs(cos(\es@th))/\es@W,
+        (0.54*\es@H*abs(cos(\es@th)) + \es@W*abs(sin(\es@th)))/(\es@W*\es@H))}%
+    \pgfmathsetmacro{\es@nh}{0.4*0.46*\es@H}%
+    \pgfmathsetmacro{\es@nd}{0.3*\es@W}%
+    % The ray meets the notch's edge, from (-W, nh) in to (-W + nd, 0), at
+    % r = (nd - W) / (cos + nd |sin| / nh) -- when it meets it within the
+    % notch, which is when r |sin| <= nh on the left.
+    \pgfmathsetmacro{\es@den}{cos(\es@th) + \es@nd*abs(sin(\es@th))/\es@nh}%
+    \pgfmathsetmacro{\es@rn}{(\es@den < -0.0001) ? (\es@nd - \es@W)/\es@den : -1}%
+    \pgfmathsetmacro{\es@rr}{((\es@rn > 0) && (\es@rn*abs(sin(\es@th)) <= \es@nh))
+        ? \es@rn : \es@rr}%
+}
+\pgfdeclareshape{energese notched consumer}{
+    \saveddimen\energese@ncn@w{\energese@ncn@fit\pgf@x=\energese@outw}
+    \saveddimen\energese@ncn@h{\energese@ncn@fit\pgf@x=\energese@outh}
+    \savedanchor\energese@ncn@ne{\energese@ncn@fit
+        \pgf@x=\energese@outw \pgf@y=\energese@outh}
+    \anchor{center}{\pgfpointorigin}
+    % The shift is computed first: pgfmath assigns to \pgf@x itself.
+    \anchor{text}{\pgfmathsetlength\energese@tmp{0.15*\energese@ncn@w}%
+        \energese@textanchor\advance\pgf@x by\energese@tmp}
+    \anchor{north}{\pgfpoint{0pt}{\energese@ncn@h}}
+    \anchor{south}{\pgfpoint{0pt}{-\energese@ncn@h}}
+    \anchor{east}{\pgfpoint{\energese@ncn@w}{0pt}}
+    \anchor{west}{\pgfpoint{-\energese@ncn@w}{0pt}}
+    \anchor{energy_in}{\pgfmathsetmacro{\es@w}{\energese@ncn@w}%
+        \pgfpoint{-0.7*\es@w pt}{0pt}}
+    \anchor{energy_out}{\pgfpoint{\energese@ncn@w}{0pt}}
+    \anchor{money_in}{\pgfmathsetmacro{\es@w}{\energese@ncn@w}%
+        \pgfmathsetmacro{\es@h}{\energese@ncn@h}%
+        \pgfpoint{\es@w pt}{0.3*\es@h pt}}
+    \anchor{money_out}{\pgfmathsetmacro{\es@w}{\energese@ncn@w}%
+        \pgfmathsetmacro{\es@h}{\energese@ncn@h}%
+        \pgfpoint{-\es@w pt}{0.3*\es@h pt}}
+    \anchor{feedback_in}{\pgfmathsetmacro{\es@w}{\energese@ncn@w}%
+        \pgfmathsetmacro{\es@h}{\energese@ncn@h}%
+        \pgfpoint{0.5*\es@w pt}{0.73*\es@h pt}}
+    \anchor{feedback_out}{\pgfmathsetmacro{\es@w}{\energese@ncn@w}%
+        \pgfmathsetmacro{\es@h}{\energese@ncn@h}%
+        \pgfpoint{-0.5*\es@w pt}{0.73*\es@h pt}}
+    \anchor{heat_sink}{\pgfpoint{0pt}{-\energese@ncn@h}}
+    \energese@ring{\energese@ncn@h}{\energese@ncn@rad}
+    \anchorborder{%
+        \pgf@xa=\pgf@x\pgf@ya=\pgf@y%
+        \pgf@process{\energese@ncn@ne}%
+        \pgfpointborderellipse{\pgfqpoint{\pgf@xa}{\pgf@ya}}{\pgfqpoint{\pgf@x}{\pgf@y}}%
+    }
+    \backgroundpath{
+        \pgfmathsetmacro{\es@w}{\energese@ncn@w}
+        \pgfmathsetmacro{\es@h}{\energese@ncn@h}
+        \pgfmathsetmacro{\es@sh}{0.46*\es@h}
+        \pgfmathsetmacro{\es@nh}{0.4*\es@sh}
+        \pgfpathmoveto{\pgfpoint{0pt}{\es@h pt}}
+        \pgfpathlineto{\pgfpoint{\es@w pt}{\es@sh pt}}
+        \pgfpathlineto{\pgfpoint{\es@w pt}{-\es@sh pt}}
+        \pgfpathlineto{\pgfpoint{0pt}{-\es@h pt}}
+        \pgfpathlineto{\pgfpoint{-\es@w pt}{-\es@sh pt}}
+        \pgfpathlineto{\pgfpoint{-\es@w pt}{-\es@nh pt}}
+        \pgfpathlineto{\pgfpoint{-0.7*\es@w pt}{0pt}}
+        \pgfpathlineto{\pgfpoint{-\es@w pt}{\es@nh pt}}
         \pgfpathlineto{\pgfpoint{-\es@w pt}{\es@sh pt}}
         \pgfpathclose
     }
@@ -893,22 +1024,28 @@
 %% -------------------------------------------------------------------------
 %% Ground -- the heat-sink terminator. A fixed-size glyph, never labelled.
 %% -------------------------------------------------------------------------
+% Three bars, each shorter than the one above, with nothing above the top bar:
+% the pathway's own arrowhead rests on it (the `energese ground arrow' tip in
+% energese.sty). Measured from the ground in strong-source.png, whose pathways
+% are about the package's weight, so the figure is near enough 1:1 -- bars of
+% 38, 27 and 13 px at 144 DPI (6.7, 4.8, 2.3 mm), 6 px (1.1 mm) apart, under an
+% arrowhead 22 px wide and 18 px tall (3.9 by 3.2 mm). Good to about 1 px.
+% An earlier glyph carried a stub above a 4 mm bar, under a 1.5 mm arrowhead
+% that stopped short of it, so the pathway appeared to end twice.
 \pgfdeclareshape{energese ground}{
     \savedanchor\centerpoint{\pgfpointorigin}
     \anchor{center}{\centerpoint}
     \anchor{north}{\pgfpoint{0pt}{0pt}}
-    \anchor{south}{\pgfpoint{0pt}{-0.3cm}}
-    \anchor{east}{\pgfpoint{0.2cm}{-0.1cm}}
-    \anchor{west}{\pgfpoint{-0.2cm}{-0.1cm}}
+    \anchor{south}{\pgfpoint{0pt}{-0.22cm}}
+    \anchor{east}{\pgfpoint{0.335cm}{0pt}}
+    \anchor{west}{\pgfpoint{-0.335cm}{0pt}}
     \backgroundpath{
-        \pgfpathmoveto{\pgfpoint{0pt}{0pt}}
-        \pgfpathlineto{\pgfpoint{0pt}{-0.1cm}}
-        \pgfpathmoveto{\pgfpoint{-0.2cm}{-0.1cm}}
-        \pgfpathlineto{\pgfpoint{0.2cm}{-0.1cm}}
-        \pgfpathmoveto{\pgfpoint{-0.1cm}{-0.17cm}}
-        \pgfpathlineto{\pgfpoint{0.1cm}{-0.17cm}}
-        \pgfpathmoveto{\pgfpoint{-0.05cm}{-0.24cm}}
-        \pgfpathlineto{\pgfpoint{0.05cm}{-0.24cm}}
+        \pgfpathmoveto{\pgfpoint{-0.335cm}{0pt}}
+        \pgfpathlineto{\pgfpoint{0.335cm}{0pt}}
+        \pgfpathmoveto{\pgfpoint{-0.24cm}{-0.11cm}}
+        \pgfpathlineto{\pgfpoint{0.24cm}{-0.11cm}}
+        \pgfpathmoveto{\pgfpoint{-0.115cm}{-0.22cm}}
+        \pgfpathlineto{\pgfpoint{0.115cm}{-0.22cm}}
         \pgfusepath{draw}
     }
 }

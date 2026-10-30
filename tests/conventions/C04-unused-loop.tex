@@ -1,0 +1,12 @@
+% C04: the unused part of a renewable inflow hooks back out where the pathway crosses the frame.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=3.4, row_spacing=1.5, system_boundary}
+    \esnode{sun}{source}   {Tr=1,  label={Sun}}
+    \esnode{farm}{producer}{Tr=10, label={Agriculture}}
+    \esflow{sun}{farm}{energy}{unused}
+\end{energese}
+\end{document}

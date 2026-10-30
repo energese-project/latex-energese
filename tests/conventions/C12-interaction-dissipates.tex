@@ -1,0 +1,16 @@
+% C12: an interaction with two inputs, one from above, and a heat sink.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=3.2, row_spacing=1.6}
+    \esnode{a}{source}      {Tr=1,   label={A}}
+    \esnode{b}{source}      {Tr=50,  label={B}}
+    \esnode{ix}{interaction}{Tr=100, label={}, attach=false}
+    \esnode{q}{storage}     {Tr=500, label={Q}}
+    \esflow{a}{ix}{energy}
+    \esflow{b}{ix}{energy}
+    \esflow{ix}{q}{energy}
+\end{energese}
+\end{document}

@@ -1,0 +1,18 @@
+% C02: dissipating components; thin heat pathways meet inside the frame, one line leaves.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=2.6, row_spacing=1.5, system_boundary}
+    \esnode{sun}{source}    {Tr=1,    label={Sun}}
+    \esnode{farm}{producer} {Tr=10,   label={Farms}}
+    \esnode{grain}{storage} {Tr=100,  label={Grain}}
+    \esnode{pop}{consumer}  {Tr=1000, label={People}}
+    \esnode{war}{misc}      {Tr=5000, label={War}}
+    \esflow{sun}{farm}{energy}
+    \esflow{farm}{grain}{energy}
+    \esflow{grain}{pop}{energy}
+    \esflow{pop}{war}{energy}
+\end{energese}
+\end{document}

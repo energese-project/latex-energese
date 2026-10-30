@@ -1,0 +1,22 @@
+% C07: sources around the frame -- lowest transformity left, over the top, highest right.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=3.0, row_spacing=1.6, system_boundary}
+    \esnode{sun}{source}      {Tr=1,     label={Renewable\\Sources}}
+    \esnode{fuel}{source}     {Tr=1000,  label={Fuels}}
+    \esnode{mat}{source}      {Tr=1000,  label={Materials}}
+    \esnode{other}{source}    {Tr=50000, label={Other\\Nations}}
+    \esnode{farm}{producer}   {Tr=10,    label={Agriculture}}
+    \esnode{ind}{misc}        {Tr=2000,  label={Industry}}
+    \esnode{def}{misc}        {Tr=20000, label={Defense}}
+    \esflow{sun}{farm}{energy}
+    \esflow{fuel}{ind}{energy}
+    \esflow{mat}{ind}{energy}
+    \esflow{farm}{ind}{energy}
+    \esflow{ind}{def}{energy}
+    \esflow{other}{def}{energy}
+\end{energese}
+\end{document}

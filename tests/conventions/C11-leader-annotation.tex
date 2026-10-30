@@ -1,0 +1,15 @@
+% C11: a note joined to what it names by a dashed leader.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=3.4, row_spacing=1.6}
+    \esnode{src}{source}    {Tr=1,   label={Strong\\Source}}
+    \esnode{ix}{interaction}{Tr=10,  label={Work}, attach=false}
+    \esnode{q}{storage}     {Tr=100, label={Stored\\Energy}}
+    \esnode{note}{text}     {x=3.4, y=2.2, label={Feedback of\\Transformed Energy}, points_to=ix}
+    \esflow{src}{ix}{energy}
+    \esflow{ix}{q}{energy}
+\end{energese}
+\end{document}

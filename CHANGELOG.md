@@ -13,6 +13,42 @@ the latest; version DOIs are listed in the record's *Versions* box.
 
 ## [Unreleased]
 
+**Drawing conventions now follow a checklist taken from Odum's figures**
+(`docs/odum-conventions.md`), each item with a crop of its source figure and a
+fixture in `tests/conventions/`. Rendered output changes throughout.
+
+### Added
+
+- `misc`: Odum's miscellaneous box. `feedback`: a pathway from a
+  higher-quality component back to a lower one, arcing over into its top.
+- `unused` on an edge: the unused part of a renewable inflow hooking back out
+  where the pathway crosses the frame.
+- `heat` on an edge: a component's dissipation taken off that pathway, marked
+  at the junction.
+- `quantity` on an edge: a pathway's quantity written opposite its name.
+- `points_to` on a text node: a dashed leader to what it names.
+- `notched` on a consumer; an unlabelled interaction feeding a single
+  consumer is drawn as its notch automatically.
+- Exchanges take `options`, `waypoints`, `energy_label_options` and
+  `money_label_options`.
+- `make conventions`: every convention's fixture beside its reference crop.
+
+### Changed
+
+- Three line weights, measured from Odum's figures: heat-sink pathways at half
+  a flow (`\energeseheatwidth`), the system window at one and a half
+  (`\energeseframewidth`).
+- An exchange is drawn as two paired tracks, 1.2 mm apart, through one small
+  diamond, as Odum draws it; the money no longer takes its own arc.
+- The ground is one large filled arrowhead resting on three bars.
+- Sources sit around the frame by transformity; a component's second,
+  higher-quality input arrives from above.
+- The frame caption goes under the bottom-left corner.
+- Interactions dissipate; transactions never do.
+- The examples are rebuilt: aggregated-economy and source-store are traced
+  from their reference figures; simple_system uses a real exchange instead of
+  a transaction used as an end point.
+
 **Rendered output changes** for any diagram drawn with `scale`, and for most
 diagrams with labelled symbols: symbols are spaced, framed and routed around
 at their real size.
