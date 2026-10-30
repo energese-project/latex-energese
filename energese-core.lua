@@ -2330,13 +2330,52 @@ function energese.render(data, options)
     -- any pathway is allocated one -- dissipation must have the port under the
     -- symbol, because Odum draws used energy leaving downwards and the drop
     -- that follows is measured from the symbol's underside.
-    local sinks = {}
+    --
+    -- Dissipation may also be taken off a pathway (C03): Odum draws a
+    -- storage's depreciation as a branch off its outflow, marked at the
+    -- junction, rather than as a line from the symbol. An edge carrying `heat`
+    -- contributes that branch, from the middle of the pathway, and its sender
+    -- then runs no heat pathway of its own -- the branch is its dissipation.
+    -- Branches join the one bundle like any tributary; `sink_x`, `sink_y` and
+    -- `sink_hh` say where each tributary starts, symbol or pathway.
+    local sinks, sink_x, sink_y, sink_hh, branch_of = {}, {}, {}, {}, {}
     if not data.metadata or data.metadata.show_heat_sink ~= false then
+        local box_of, branched = {}, {}
+        for _, box in ipairs(boxes) do box_of[box.id] = box end
+        for _, edge in ipairs(data.edges) do
+            if edge.heat then branched[edge.from] = true end
+        end
         for _, node in ipairs(data.nodes) do
             -- See DISSIPATES: a transaction, standalone or an exchange's
             -- marker, transforms nothing and dissipates nothing.
-            if energese.DISSIPATES[node.type] then
+            if energese.DISSIPATES[node.type] and not branched[node.id] then
                 sinks[#sinks + 1] = node.id
+                sink_x[node.id], sink_y[node.id] = x_coords[node.id], y_coords[node.id]
+                sink_hh[node.id] = box_of[node.id] and box_of[node.id].hh or 0.3
+            end
+        end
+        for i, edge in ipairs(data.edges) do
+            if edge.heat and x_coords[edge.from] and x_coords[edge.to] then
+                local id = "heat-edge-" .. i
+                sinks[#sinks + 1] = id
+                branch_of[id] = i
+                -- The middle of the pathway between the two symbols' edges,
+                -- where TikZ's pos=0.5 falls on the drawn curve.
+                local ax, ay = x_coords[edge.from], y_coords[edge.from]
+                local bx, by = x_coords[edge.to], y_coords[edge.to]
+                local len = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
+                local dx, dy = (bx - ax) / math.max(len, 1e-9), (by - ay) / math.max(len, 1e-9)
+                -- Pathways meet a text or box node at its centre
+                -- (edge_anchors), so the drawn pathway runs right into it.
+                local function exit(id2)
+                    local b = box_of[id2]
+                    local n = node_map[id2]
+                    if not b or (n and (n.type == "text" or n.type == "box")) then return 0 end
+                    return math.min(b.hw / math.max(math.abs(dx), 1e-6),
+                                    b.hh / math.max(math.abs(dy), 1e-6))
+                end
+                local mid = (exit(edge.from) + len - exit(edge.to)) / 2
+                sink_x[id], sink_y[id], sink_hh[id] = ax + dx * mid, ay + dy * mid, 0
             end
         end
     end
@@ -2346,8 +2385,12 @@ function energese.render(data, options)
     -- drops out of its symbol, and the lane each one turns in at.
     local ground_x, drop, lane_gap, turns, lowest_turn
     if #sinks > 0 then
+        -- Under the middle of what dissipates. The middle of every node put
+        -- it under the sources too -- outside the frame, for a diagram with a
+        -- source on the left -- and the trunk ran sideways to reach it.
         local min_x, max_x = 1e9, -1e9
-        for _, x in pairs(x_coords) do
+        for _, id in ipairs(sinks) do
+            local x = sink_x[id]
             if x > max_x then max_x = x end
             if x < min_x then min_x = x end
         end
@@ -2362,10 +2405,8 @@ function energese.render(data, options)
         -- shorter than the symbol's half-height would run back up inside the
         -- glyph, and the pathway would appear to start somewhere other than
         -- its connection port.
-        local hh_of = {}
-        for _, box in ipairs(boxes) do hh_of[box.id] = box.hh end
-        turns, lowest_turn = energese.dissipation_turns(sinks, x_coords,
-            y_coords, hh_of, ground_x, drop, lane_gap)
+        turns, lowest_turn = energese.dissipation_turns(sinks, sink_x,
+            sink_y, sink_hh, ground_x, drop, lane_gap)
     end
     -- Where the tributaries meet, relative to the window's underside.
     local COLLECT_RISE = 0.45 * row_spacing
@@ -2445,9 +2486,12 @@ function energese.render(data, options)
 
     for _, id in ipairs(sinks) do
         -- Reserved against the symbol itself: there is no other end to lean
-        -- towards, and the port wanted is the one the anchor names.
-        tex.print(string.format(
-            "\\energeseport{%s}{heat_sink}{%s}\\energesekeepport{heat@%s}", id, id, id))
+        -- towards, and the port wanted is the one the anchor names. A branch
+        -- off a pathway leaves from the pathway, and claims nothing.
+        if not branch_of[id] then
+            tex.print(string.format(
+                "\\energeseport{%s}{heat_sink}{%s}\\energesekeepport{heat@%s}", id, id, id))
+        end
     end
 
     -- Then every pathway's ports, granted in geometric order and stashed under
@@ -2601,7 +2645,7 @@ function energese.render(data, options)
             -- and bulged the curve out sideways before it could turn. One
             -- segment from the lane's depth straight to the junction keeps the
             -- nesting and keeps the curve.
-            local sx, sy = x_coords[id], turns[id]
+            local sx, sy = sink_x[id], turns[id]
             -- Never below the junction: a tributary that dropped past it would
             -- have to come back up. Only an author's heat_sink_y with no
             -- window can bring that about; a window is deepened to prevent it.
@@ -2619,12 +2663,9 @@ function energese.render(data, options)
                 pts[#pts + 1] = w
             end
             pts[#pts + 1] = { ground_x, collect_y }
-            local hh = 0.3
-            for _, box in ipairs(boxes) do
-                if box.id == id then hh = box.hh end
-            end
             bundle.paths[#bundle.paths + 1] = { id = id, pts = pts,
-                                                top = y_coords[id] - hh }
+                                                top = sink_y[id] - sink_hh[id],
+                                                branch = branch_of[id] }
         end
     end
 
@@ -2659,12 +2700,65 @@ function energese.render(data, options)
                 edge.marker, edge.marker_magnitude or 1.0, EXCHANGE_GAP / 2)
         end
 
-        local label_code = marker_code
+        -- The unused part of a renewable inflow (C04): where the pathway
+        -- crosses the system window -- or a third of the way along, if there
+        -- is none -- a branch hooks forward, round to the right of the flow
+        -- and back out past the crossing, ending in an arrow outside. Odum
+        -- draws it on the sun's pathways: energy that reaches the system and
+        -- leaves unused. The point is set on the pathway TikZ draws, at the
+        -- fraction where the chord between the two symbols crosses the frame.
+        local unused_code, unused_at = "", nil
+        if edge.unused and x_coords[from] and x_coords[to] then
+            local ax, ay = x_coords[from], y_coords[from]
+            local bx, by = x_coords[to], y_coords[to]
+            local len = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
+            if len > 1e-9 then
+                local dx, dy = (bx - ax) / len, (by - ay) / len
+                -- Where the chord leaves each symbol, as distances along it.
+                local function exit(id)
+                    local n = node_map[id]
+                    if n and (n.type == "text" or n.type == "box") then return 0 end
+                    for _, b in ipairs(boxes) do
+                        if b.id == id then
+                            return math.min(b.hw / math.max(math.abs(dx), 1e-6),
+                                            b.hh / math.max(math.abs(dy), 1e-6))
+                        end
+                    end
+                    return 0
+                end
+                local s0, s1 = exit(from), len - exit(to)
+                local cross = s0 + (s1 - s0) / 3
+                for _, w in ipairs(windows) do
+                    for _, edge_t in ipairs({
+                        (math.abs(dx) > 1e-9) and ((w.x_min - ax) / dx) or nil,
+                        (math.abs(dx) > 1e-9) and ((w.x_max - ax) / dx) or nil,
+                        (math.abs(dy) > 1e-9) and ((w.y_min - ay) / dy) or nil,
+                        (math.abs(dy) > 1e-9) and ((w.y_max - ay) / dy) or nil }) do
+                        local px, py = ax + dx * edge_t, ay + dy * edge_t
+                        if edge_t > s0 and edge_t < s1
+                           and px >= w.x_min - 1e-6 and px <= w.x_max + 1e-6
+                           and py >= w.y_min - 1e-6 and py <= w.y_max + 1e-6 then
+                            cross = edge_t
+                        end
+                    end
+                end
+                local t = math.max(0.05, math.min(0.95, (cross - s0) / (s1 - s0)))
+                unused_code = string.format(" coordinate[pos=%.3f] (energese-unused-%d)",
+                                            t, edge_index)
+                unused_at = { dx = dx, dy = dy }
+            end
+        end
+
+        if edge.heat and bundle then
+            unused_code = unused_code .. string.format(
+                " coordinate[pos=0.5] (energese-heat-%d)", edge_index)
+        end
+        local label_code = marker_code .. unused_code
         local name, quantity = edge.label, edge.quantity
         if not name then name, quantity = quantity, nil end
         if name then
             label_code = string.format("%s node[%s] {%s}",
-                marker_code, label_opts[edge_index], name)
+                label_code, label_opts[edge_index], name)
         end
         if quantity and quantity_opts[edge_index] then
             label_code = string.format("%s node[%s] {%s}",
@@ -2713,6 +2807,20 @@ function energese.render(data, options)
                 "\\draw[%s] (\\energesefromport) to [%s] %s (\\energesetoport);",
                 style, shape, label_code))
         end
+        if unused_at then
+            -- Forward along the flow, round to its right, and back out
+            -- behind the crossing: the hook of pyramids-as-organisers.png.
+            local dx, dy = unused_at.dx, unused_at.dy
+            local nx, ny = dy, -dx
+            tex.print(string.format(
+                "\\draw[energese energy] (energese-unused-%d) .. controls "
+                .. "($(energese-unused-%d)+(%.3f,%.3f)$) and ($(energese-unused-%d)+(%.3f,%.3f)$) "
+                .. ".. ($(energese-unused-%d)+(%.3f,%.3f)$);",
+                edge_index,
+                edge_index, 0.55 * dx, 0.55 * dy,
+                edge_index, 0.55 * dx + 0.8 * nx, 0.55 * dy + 0.8 * ny,
+                edge_index, -0.5 * dx + 0.8 * nx, -0.5 * dy + 0.8 * ny))
+        end
     end
 
     -- The system window, drawn. It was computed before the pathways -- a label
@@ -2740,10 +2848,21 @@ function energese.render(data, options)
     -- The dissipation bundle, drawn.
     if bundle then
         for _, path in ipairs(bundle.paths) do
-            tex.print(string.format(
-                "\\energeserecallport{heat@%s}"
-                .. "\\draw[energese heat] (\\energeseportname) -- (%.4f, %.4f) %s;",
-                path.id, path.pts[1][1], path.pts[1][2], heat_path(path.pts)))
+            if path.branch then
+                -- Off the pathway, with Odum's small filled triangle under the
+                -- junction (store.png: about 2 mm, point down).
+                tex.print(string.format(
+                    "\\draw[energese heat] (energese-heat-%d) -- (%.4f, %.4f) %s;"
+                    .. "\\fill ($(energese-heat-%d)+(-0.1,-0.03)$) -- ++(0.2,0) "
+                    .. "-- ++(-0.1,-0.18) -- cycle;",
+                    path.branch, path.pts[1][1], path.pts[1][2], heat_path(path.pts),
+                    path.branch))
+            else
+                tex.print(string.format(
+                    "\\energeserecallport{heat@%s}"
+                    .. "\\draw[energese heat] (\\energeseportname) -- (%.4f, %.4f) %s;",
+                    path.id, path.pts[1][1], path.pts[1][2], heat_path(path.pts)))
+            end
         end
 
         -- One line from the collection point out through the frame, and
