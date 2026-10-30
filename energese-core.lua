@@ -1176,6 +1176,11 @@ end
 local GROWTH_ALLOWANCE = 1.6
 
 function energese.label_fits(node)
+    -- A text node is its label and a box is sized by what it holds: neither
+    -- has a symbol for the text to outgrow. Applied to a note, the rule moved
+    -- the words outside an empty node, and a leader drawn from the note began
+    -- at nothing.
+    if node.type == "text" or node.type == "box" then return true end
     local half = HALF_EXTENT[node.type]
     if not half then return true end
     local cap = half[1] * energese.UNIT_CM * (node.magnitude or 1.0) * GROWTH_ALLOWANCE
@@ -1946,20 +1951,34 @@ function energese.place_edge_labels(edges, geom, boxes, x_coords, y_coords,
         end
     end
 
-    local placed, out = {}, {}
+    -- A pathway may carry its name (`label`) and its quantity (`quantity`), on
+    -- opposite sides, as Odum writes J0 over the line and 2 g/Day under it
+    -- (C09). The two are placed together, at one position along the pathway,
+    -- and scored together, so neither is put somewhere clear at the other's
+    -- expense. A quantity on its own is placed as a label would be.
+    local placed, out, qout = {}, {}, {}
     for i, edge in ipairs(edges) do
+        local name, quantity = edge.label, edge.quantity
+        if not name then name, quantity = quantity, nil end
         -- An author who has written label_options has placed the label.
-        if not edge.label or edge.label_options then
+        if not name or edge.label_options then
             out[i] = edge.label_options or LABEL_DEFAULT
+            if edge.label and edge.quantity then
+                qout[i] = "midway, below, inner sep=2pt, font=\\energeselabelfont"
+            end
         elseif not curves[i] then
             out[i] = LABEL_DEFAULT
+            if quantity then
+                qout[i] = "midway, below, inner sep=2pt, font=\\energeselabelfont"
+            end
         else
             -- Scored a little larger than estimated. The estimate is good to
             -- a few percent, and a placement that clears an obstacle by less
             -- than that is not clear at all -- the search will happily take a
             -- position whose whole margin is estimation error.
-            local hw = math.max(label_half_width(edge.label), 0.08) * 1.15 + 0.06
+            local hw = math.max(label_half_width(name), 0.08) * 1.15 + 0.06
             local hh = 0.5 * LABEL_HEIGHT + 0.04
+            local qhw = quantity and (math.max(label_half_width(quantity), 0.08) * 1.15 + 0.06)
             local best, best_score
             for pi, pos in ipairs(LABEL_POS) do
                 for _, side in ipairs({ "above", "below" }) do
@@ -1973,11 +1992,20 @@ function energese.place_edge_labels(edges, geom, boxes, x_coords, y_coords,
                         -- written across a third.
                         local score = energese.label_conflicts(px, cy, hw, hh,
                             nil, obstacles, segments)
+                        local qy = quantity and (2 * py - cy)
+                        if quantity then
+                            score = score + energese.label_conflicts(px, qy, qhw, hh,
+                                nil, obstacles, segments)
+                        end
                         -- Two labels on top of each other are worse than
                         -- either on a pathway, and as bad as one on a symbol.
                         for _, other in ipairs(placed) do
                             if math.abs(other.x - px) < other.hw + hw
                                and math.abs(other.y - cy) < other.hh + hh then
+                                score = score + 10
+                            end
+                            if quantity and math.abs(other.x - px) < other.hw + qhw
+                               and math.abs(other.y - qy) < other.hh + hh then
                                 score = score + 10
                             end
                         end
@@ -1990,7 +2018,7 @@ function energese.place_edge_labels(edges, geom, boxes, x_coords, y_coords,
                         if not best_score or score < best_score then
                             best_score = score
                             best = { pos = pos, side = side, lift = lift,
-                                     x = px, y = cy, hw = hw, hh = hh }
+                                     x = px, y = cy, hw = hw, hh = hh, qpy = py }
                         end
                     end
                 end
@@ -1999,9 +2027,17 @@ function energese.place_edge_labels(edges, geom, boxes, x_coords, y_coords,
             out[i] = string.format(
                 "pos=%.2f, %s=%.2fcm, inner sep=2pt, font=\\energeselabelfont",
                 best.pos, best.side, best.lift)
+            if quantity then
+                local other = (best.side == "above") and "below" or "above"
+                placed[#placed + 1] = { x = best.x, y = 2 * best.qpy - best.y,
+                                        hw = qhw, hh = hh }
+                qout[i] = string.format(
+                    "pos=%.2f, %s=%.2fcm, inner sep=2pt, font=\\energeselabelfont",
+                    best.pos, other, best.lift)
+            end
         end
     end
-    return out
+    return out, qout
 end
 
 -- ---------------------------------------------------------------------------
@@ -2267,6 +2303,22 @@ function energese.render(data, options)
             tex.print(string.format(
                 "\\node[energese text, %s=2pt of %s] {%s};",
                 place.where, node.id, place.outside))
+        end
+    end
+
+    -- A note joined to what it names by a dashed leader, as Odum annotates
+    -- (C11): a thin, finely dashed line with a small head, bowed slightly. It
+    -- is an annotation, not a flow, so it is not routed and claims no port.
+    local node_ids = {}
+    for _, node in ipairs(data.nodes) do node_ids[node.id] = true end
+    for _, node in ipairs(data.nodes) do
+        if node.points_to then
+            if not node_ids[node.points_to] then
+                report_error("Node '" .. node.id .. "' points_to '"
+                    .. node.points_to .. "', which is not a node")
+            end
+            tex.print(string.format("\\draw[energese leader] (%s) to[bend left=12] (%s);",
+                node.id, node.points_to))
         end
     end
 
@@ -2576,7 +2628,7 @@ function energese.render(data, options)
         end
     end
 
-    local label_opts = energese.place_edge_labels(data.edges, geom, boxes,
+    local label_opts, quantity_opts = energese.place_edge_labels(data.edges, geom, boxes,
                                                   x_coords, y_coords, windows,
                                                   bundle, node_map)
 
@@ -2608,9 +2660,15 @@ function energese.render(data, options)
         end
 
         local label_code = marker_code
-        if edge.label then
+        local name, quantity = edge.label, edge.quantity
+        if not name then name, quantity = quantity, nil end
+        if name then
             label_code = string.format("%s node[%s] {%s}",
-                marker_code, label_opts[edge_index], edge.label)
+                marker_code, label_opts[edge_index], name)
+        end
+        if quantity and quantity_opts[edge_index] then
+            label_code = string.format("%s node[%s] {%s}",
+                label_code, quantity_opts[edge_index], quantity)
         end
 
         -- The ports this pathway was granted above. Each end holds one, so a

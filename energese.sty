@@ -96,6 +96,10 @@
     % top bar: Odum's is large and filled, 3.9 by 3.2 mm (energese-shapes.tex).
     energese ground arrow/.style={-{Triangle[length=3.2mm, width=3.9mm]},
         solid, black, line width=\energeseheatwidth},
+    % A note's leader to what it names: thin, finely dashed, small head.
+    energese leader/.style={-{Triangle[length=1.6mm, width=1.2mm]},
+        dash pattern=on 1.5pt off 1.5pt, black, line width=\energeseheatwidth,
+        shorten >=1pt, shorten <=2pt},
     % The system window.
     energese frame/.style={draw, black, line width=\energeseframewidth}
 }
