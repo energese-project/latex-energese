@@ -11,7 +11,7 @@ local energese = {}
 -- sink on one made the diamond read as a component consuming what flowed in.
 energese.DISSIPATES = {
     producer = true, consumer = true, storage = true, interaction = true,
-    gain = true, loop_limited = true, switch = true,
+    gain = true, loop_limited = true, switch = true, misc = true,
 }
 
 local function report_error(msg)
@@ -275,7 +275,7 @@ function energese.validate_node(node)
     local valid_types = {
         source = true, producer = true, consumer = true,
         storage = true, interaction = true, transaction = true,
-        gain = true, loop_limited = true, switch = true,
+        gain = true, loop_limited = true, switch = true, misc = true,
         text = true, box = true, ground = true
     }
     if not valid_types[node.type] then
@@ -298,7 +298,8 @@ function energese.validate_edge(edge, node_ids)
     end
 
     local valid_types = {
-        energy = true, money_feedback = true, information = true, material = true
+        energy = true, money_feedback = true, information = true, material = true,
+        feedback = true
     }
     if not valid_types[edge.type] then
         return false, "Edge has invalid type '" .. edge.type .. "'"
@@ -541,6 +542,7 @@ local HALF_EXTENT = {
     transaction = {0.551, 0.250}, interaction  = {0.533, 0.283},
     gain        = {0.268, 0.291}, loop_limited = {0.436, 0.428},
     switch      = {0.468, 0.452}, box          = {0.450, 0.300},
+    misc        = {0.774, 0.475},
     text        = {0.400, 0.200}, ground       = {0.200, 0.150},
 }
 
@@ -599,7 +601,7 @@ local FIT = {
     producer     = {1.726, 0.710, 1.0},  consumer = {0.877, 1.0,   0.46},
     transaction  = {2.226, 0.5,   0.5},  interaction = {1.886, 0.708, 0.85},
     gain         = {0.917, 0.45,  0.55}, loop_limited = {1.019, 0.740, 1.0},
-    switch       = {1.036, 0.715, 0.715},
+    switch       = {1.036, 0.715, 0.715}, misc = {1.63, 1.0, 1.0},
 }
 
 -- Source and storage do not go through \energese@fit: their outline is a
@@ -2032,6 +2034,10 @@ function energese.edge_anchors(edge, node_map)
     if edge.type == "money_feedback" then
         from_anchor = "money_out"
         to_anchor = "money_in"
+    elseif edge.type == "feedback" then
+        -- Out of the provider's top and down into the receiver's (C08).
+        from_anchor = "feedback_out"
+        to_anchor = "feedback_in"
     elseif edge.type == "information" then
         to_anchor = "north"
     end
@@ -2416,8 +2422,8 @@ function energese.render(data, options)
         -- Only supply it when the edge has not routed itself: two routings
         -- fight each other and the arc balloons into a circle.
         local ROUTE = "out=90, in=90, looseness=1.2"
-        if edge.type == "money_feedback" and not edge.exchange_leg
-            and not options:match("bend")
+        if (edge.type == "money_feedback" or edge.type == "feedback")
+            and not edge.exchange_leg and not options:match("bend")
             and not options:match("out%s*=") and not options:match("in%s*=") then
             options = options ~= "" and (options .. ", " .. ROUTE) or ROUTE
         end

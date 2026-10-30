@@ -74,6 +74,7 @@
     energese loop_limited/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese loop_limited, minimum height=0.855\energeseunit, minimum width=0.645\energeseunit, align=center, fill=white, font=\energeselabelfont},
     energese switch/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese switch, minimum height=0.645\energeseunit, minimum width=0.645\energeseunit, align=center, fill=white, font=\energeselabelfont},
     energese ground/.style={draw=none, line width=\energeselinewidth, shape=energese ground, fill=none},
+    energese misc/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese misc, minimum height=0.95\energeseunit, minimum width=1.55\energeseunit, align=center, fill=white, font=\energeselabelfont},
     energese box/.style={draw, line width=\energeselinewidth, shape=rectangle, align=center, fill=white, font=\energeselabelfont},
     energese text/.style={align=center, font=\energeselabelfont},
     % Edge styles
@@ -84,6 +85,9 @@
     % sets its own bend and blows the arc up into a full circle.
     energese money_feedback/.style={->, dashed, black, line width=\energeseflowwidth},
     energese information/.style={->, solid, black, line width=\energeseflowwidth},
+    % Feedback: a higher-quality component serving a lower one, drawn as Odum
+    % draws it -- a pathway arcing back over the top into the receiver.
+    energese feedback/.style={->, solid, black, line width=\energeseflowwidth},
     % Dissipation pathways are drawn at the heat-sink weight (see above), and
     % converge on a single ground, so they carry no head of their own -- one
     % flow, one arrowhead, at the terminator.

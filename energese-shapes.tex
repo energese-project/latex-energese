@@ -540,6 +540,54 @@
 }
 
 %% -------------------------------------------------------------------------
+%% Miscellaneous box -- Odum's rectangle for a process with no symbol of its own.
+%% -------------------------------------------------------------------------
+% Measured from reference-images/complete-odum-symbols.png: 98 by 60 px between
+% outline centres, an aspect of 1.63, and the same height as the sheet's
+% producer (60 against 63 px). Energy in on the left and out on the right, a
+% second input onto the top, heat sink below -- the sheet draws all four. Text
+% may fill it, as it may a producer's body.
+\def\energese@msc@rad{%
+    \pgfmathsetmacro{\es@a}{\energese@msc@w}%
+    \pgfmathsetmacro{\es@b}{\energese@msc@h}%
+    \pgfmathsetmacro{\es@rr}{min(\es@a/max(0.05,abs(cos(\es@th))),
+                                 \es@b/max(0.05,abs(sin(\es@th))))}%
+}
+\pgfdeclareshape{energese misc}{
+    \saveddimen\energese@msc@w{\energese@fit{1.63}{1.0}{1.0}\pgf@x=\energese@outw}
+    \saveddimen\energese@msc@h{\energese@fit{1.63}{1.0}{1.0}\pgf@x=\energese@outh}
+    \savedanchor\energese@msc@ne{\energese@fit{1.63}{1.0}{1.0}%
+        \pgf@x=\energese@outw \pgf@y=\energese@outh}
+    \anchor{center}{\pgfpointorigin}
+    \anchor{text}{\energese@textanchor}
+    \anchor{north}{\pgfpoint{0pt}{\energese@msc@h}}
+    \anchor{south}{\pgfpoint{0pt}{-\energese@msc@h}}
+    \anchor{east}{\pgfpoint{\energese@msc@w}{0pt}}
+    \anchor{west}{\pgfpoint{-\energese@msc@w}{0pt}}
+    \anchor{energy_in}{\pgfpoint{-\energese@msc@w}{0pt}}
+    \anchor{energy_out}{\pgfpoint{\energese@msc@w}{0pt}}
+    \anchor{money_in}{\pgfmathsetmacro{\es@a}{\energese@msc@w}%
+        \pgfpoint{0.6*\es@a pt}{\energese@msc@h}}
+    \anchor{money_out}{\pgfmathsetmacro{\es@a}{\energese@msc@w}%
+        \pgfpoint{-0.6*\es@a pt}{\energese@msc@h}}
+    \anchor{feedback_in}{\pgfmathsetmacro{\es@a}{\energese@msc@w}%
+        \pgfpoint{0.3*\es@a pt}{\energese@msc@h}}
+    \anchor{feedback_out}{\pgfmathsetmacro{\es@a}{\energese@msc@w}%
+        \pgfpoint{-0.3*\es@a pt}{\energese@msc@h}}
+    \anchor{heat_sink}{\pgfpoint{0pt}{-\energese@msc@h}}
+    \energese@ring{\energese@msc@h}{\energese@msc@rad}
+    \anchorborder{%
+        \pgf@xa=\pgf@x\pgf@ya=\pgf@y%
+        \pgf@process{\energese@msc@ne}%
+        \pgfpointborderrectangle{\pgfqpoint{\pgf@xa}{\pgf@ya}}{\pgfqpoint{\pgf@x}{\pgf@y}}%
+    }
+    \backgroundpath{
+        \pgfpathrectanglecorners{\pgfpoint{-\energese@msc@w}{-\energese@msc@h}}
+                                {\pgfpoint{\energese@msc@w}{\energese@msc@h}}
+    }
+}
+
+%% -------------------------------------------------------------------------
 %% Consumer -- a hexagon, pointed top and bottom, with vertical sides.
 %% -------------------------------------------------------------------------
 % Measured from reference-images/complete-odum-symbols.png by flood-filling the
