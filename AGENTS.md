@@ -255,6 +255,33 @@ independently, which is what this replaced, brought them into the junction from
 all directions and they crossed on the way; dissipation pathways that cross read
 as pathways meeting where nothing joins.
 
+**The lane is an absolute depth.** Measured from each symbol's own underside,
+lanes only nested when the components shared a row: a component two rows up
+turned in two rows higher whatever its reach, ran above the nearer tributary,
+cut under that one's symbol and was routed round it below the junction, crossing
+it twice. `energese.dissipation_turns` takes each side of the trunk in order of
+reach and turns each tributary in at its own drop or one lane below the nearer
+one, whichever is lower; the two sides never meet, so they nest independently.
+The junction sits a full drop below the deepest turn, so the tributaries meet it
+at an angle instead of running together for their last stretch.
+
+**The tributary's handle is bounded by its drop.** It leaves its turn straight
+down, and TikZ sizes an `out=-90` handle at a third of the chord — two units for
+a tributary five units out and a quarter of a unit above the junction, so the
+curve sagged under the junction and climbed back in. `heat_controls` caps the
+downward handle at the drop, which puts every control point at or above the
+junction; a cubic stays in the hull of its control points. The drawing and the
+label placement both use it, so the curve labels keep off is the one drawn.
+
+**A window too shallow for the funnel is deepened, and says so.** The funnel
+converges inside the window, so the window must reach a full drop and the
+junction's rise below the deepest turn. A hand-drawn frame that does not had
+every lane under its floor clamped to one height — the tributaries ran along
+the bottom of the frame and across each other. The floor is lowered instead,
+with a warning naming the new height: it encloses nothing new, only empty
+space, and it is the same choice already made for a `heat_sink_y` that would
+put the ground inside the frame.
+
 Two ways of expressing that lane are wrong, and both were tried:
 
 - **Not as a waypoint.** A point to turn at puts a corner mid-pathway, and the
