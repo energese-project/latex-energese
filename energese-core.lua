@@ -400,9 +400,15 @@ local EXCHANGE_GAP = 0.12
 local EXCHANGE_MAGNITUDE = 0.36
 
 function energese.expand_exchanges(data)
+    local node_map = {}
+    for _, node in ipairs(data.nodes) do node_map[node.id] = node end
     local added = {}
     for _, node in ipairs(data.nodes) do
         if node.seller and node.buyer then
+            -- `options` on the exchange routes its goods (and so its money,
+            -- which mirrors them): Odum runs the human-service exchange in
+            -- aggregated-economy.png over the top of the whole system.
+            --
             -- Goods run seller to buyer as ONE continuous pathway, and the
             -- diamond rides it as a marker at the midpoint, rotated to the
             -- flow. It is not a component the pathway enters: Odum draws the
@@ -410,9 +416,19 @@ function energese.expand_exchanges(data)
             -- every other symbol forbids. An exchange annotates a coupling, it
             -- does not transform anything -- so there is nothing to flow into,
             -- and nothing to give it a transformity of its own.
+            -- Goods running down the hierarchy -- a service fed back, as the
+            -- consumers' human service to industry -- are feedback, not a
+            -- forward flow, and the falling-quality check does not apply.
+            local seller, buyer = node_map[node.seller], node_map[node.buyer]
+            local falls = seller and buyer and seller.Tr and buyer.Tr
+                          and buyer.Tr < seller.Tr
             added[#added + 1] = {
-                from = node.seller, to = node.buyer, type = "energy",
-                label = node.energy_label, options = "bend left=8",
+                from = node.seller, to = node.buyer,
+                type = falls and "feedback" or "energy",
+                from_anchor = "energy_out", to_anchor = "energy_in",
+                waypoints = node.waypoints,
+                label = node.energy_label, label_options = node.energy_label_options,
+                options = node.options or "bend left=8",
                 exchange = node.id, exchange_leg = "goods",
                 marker = node.type or "transaction",
                 marker_magnitude = node.magnitude or EXCHANGE_MAGNITUDE,
@@ -429,7 +445,7 @@ function energese.expand_exchanges(data)
             -- the next one lands well away from the goods.
             added[#added + 1] = {
                 from = node.buyer, to = node.seller, type = "money_feedback",
-                label = node.money_label,
+                label = node.money_label, label_options = node.money_label_options,
                 exchange = node.id, exchange_leg = "money",
             }
         end

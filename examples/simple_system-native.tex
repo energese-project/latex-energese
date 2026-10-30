@@ -5,16 +5,16 @@
 \usepackage{energese}
 \begin{document}
 \begin{energese}
-    \esmeta{column_spacing=3.0, row_spacing=1.5, show_heat_sink=true}
+    \esmeta{column_spacing=3.4, row_spacing=1.5, show_heat_sink=true}
 
-    \esnode{sun}{source}         {Tr=1,    label={Sun}}
-    \esnode{grass}{producer}     {Tr=100,  label={Grass}}
-    \esnode{cow}{consumer}       {Tr=2000, label={Cow}}
-    \esnode{market}{transaction} {Tr=5000, label={Market}}
+    \esnode{sun}{source}      {Tr=1,     label={Sun}}
+    \esnode{grass}{producer}  {Tr=100,   label={Grass}}
+    \esnode{cow}{consumer}    {Tr=2000,  label={Cattle}}
+    \esnode{town}{consumer}   {Tr=10000, label={Town}}
+    \esnode{market}{transaction}{seller=cow, buyer=town,
+                                 energy_label={beef}, money_label={\$}}
 
     \esflow{sun}{grass}{energy}
     \esflow{grass}{cow}{energy}
-    \esflow{cow}{market}{energy}
-    \esflow{market}{grass}{money_feedback}
 \end{energese}
 \end{document}
