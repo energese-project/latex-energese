@@ -283,6 +283,25 @@ The rules the engine applies on its own, all from that list:
   `calc`; it takes no ring ports, which are a pitch apart along the outline and
   land far off on a corner. Goods running down the hierarchy are `feedback`.
 
+- **Bundles** (C22, `bundle`): members share a route as parallel tracks,
+  ranked across the bundle by where they sit against its first member's
+  direction (a member running the other way counts its side against that, not
+  its own travel). Their waypoints are offset by rank at the measured pitch;
+  their ports are requested in an order worked out from the allocator's own
+  stepping, so each track gets the port on its side and the fan does not cross
+  at the ends. The money of an exchange is offset from its goods' ports along
+  the direction to the nearest waypoint, not the chord, or it starts on the
+  wrong side of a routed track.
+- **The diamond rides the whole route** (C23): placed by length along the
+  polyline (`energese.polyline_at`), not on the first segment; staggered in a
+  bundle; `diamond_at` overrides.
+
+**The port allocator keeps to the approaching side.** It grants the anchor's
+port, then steps outward on the side the pathway comes from until half the ring,
+and only then the other side. It used to alternate (0, +s, -s, +2s, ...), which
+sent a pathway arriving from above to the first free port below once the ports
+round the anchor were taken, across every pathway between.
+
 A worked example that reproduces one of Odum's figures is traced (C21): every
 position measured from the figure, so its composition is his. Automatic layout
 is judged on its own fixtures, not on reproducing his hand composition.

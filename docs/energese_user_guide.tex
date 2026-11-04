@@ -217,6 +217,10 @@ and a buyer)}} \\
 \texttt{energy\_label\_options}, \texttt{money\_label\_options} & no & Place a
 caption by hand. \\
 \texttt{options}, \texttt{waypoints} & no & Route the goods; the money follows. \\
+\texttt{from\_anchor}, \texttt{to\_anchor} & no & Where the goods leave the seller and
+meet the buyer. \\
+\texttt{bundle}, \texttt{diamond\_at} & no & Run with other pathways in a bundle;
+place the diamond, as a fraction of the route. \\
 \bottomrule
 \end{tabular}
 \caption{Node keys. $\dagger$~not required for \texttt{text}, \texttt{box} or
@@ -243,6 +247,8 @@ the label by hand; without it the label is placed automatically. \\
 \texttt{unused}            & no  & On a source's pathway: draw the unused-energy hook. \\
 \texttt{heat}              & no  & Take the sender's dissipation off this pathway. \\
 \texttt{volume}            & no  & Line width in points, to show relative flow. \\
+\texttt{bundle}            & no  & Name a bundle: pathways sharing it run side by
+side along their routes and fan out at the ends. \\
 \bottomrule
 \end{tabular}
 \caption{Edge keys.}
@@ -302,6 +308,12 @@ An exchange annotates a coupling and transforms nothing: it carries no
 transformity and no heat sink, and nothing may be anchored to it. A
 \texttt{transaction} used as an ordinary node --- energy flowing into it and
 stopping --- is not an exchange, and the energetic checks report it.
+
+The diamond sits halfway along the route, wherever it bends. Exchanges that
+share a route --- several sales between the same two components, or a service
+fed back to more than one --- are given one \texttt{bundle}: they run side by
+side, 3.2\,mm apart, their diamonds staggered along the tracks so that no two
+sit abreast, and fan out at each end into the symbols' own points.
 
 Goods that run down the hierarchy, from a higher transformity to a lower, are a
 service fed back rather than a forward flow, and are drawn and checked as
@@ -581,6 +593,26 @@ into its top.
     \esflow{sky}{ind}{feedback}
 \end{energese}}{2.6cm}
 
+\paragraph{Bundles.} Pathways sharing a route run side by side and fan into the
+notch, each exchange with its own diamond (\texttt{bundle}).
+
+\conv{docs/conventions/C22-bundle-fan.png}{%
+\begin{energese}[scale=0.7]
+    \esmeta{row_spacing=1.2, show_heat_sink=false}
+    \esnode{fuel}{source}  {Tr=1000, x=4.4, y=4.6, label={Fuels}}
+    \esnode{ore}{source}   {Tr=1000, x=6.0, y=4.6, label={Ores}}
+    \esnode{agri}{producer}{Tr=10,   x=0.0, y=0.0, label={Agriculture}}
+    \esnode{ind}{consumer} {Tr=2000, x=4.6, y=2.4, magnitude=1.3, notched, label={Industry}}
+    \esnode{a}{transaction}{seller=agri, buyer=ind, bundle=corridor, from_anchor=north,
+                            waypoints={0.6,1.2; 2.2,2.4}}
+    \esnode{b}{transaction}{seller=agri, buyer=ind, bundle=corridor, from_anchor=north,
+                            waypoints={0.6,1.2; 2.2,2.4}}
+    \esnode{c}{transaction}{seller=agri, buyer=ind, bundle=corridor, from_anchor=north,
+                            waypoints={0.6,1.2; 2.2,2.4}}
+    \esflow{fuel}{ind}{energy}{bundle=top, waypoints={4.4,3.6}}
+    \esflow{ore}{ind}{energy} {bundle=top, waypoints={4.4,3.6}}
+\end{energese}}{3cm}
+
 \paragraph{Used energy and the ground.} Thin heat pathways merging inside the
 frame, one line leaving it, and one large arrowhead resting on the ground.
 
@@ -788,8 +820,10 @@ guarantees:
 port nearest that direction. For the anchors on an axis that is the same point;
 elsewhere it is within half a pitch of it.
 \item \textbf{A port holds one pathway.} The second pathway to want a port
-takes the next one along, on the side it approaches from, so a fan of flows
-leaves a symbol as a fan rather than as one line drawn several times.
+takes the next one along on the side it approaches from, and keeps to that side
+while ports there are free, so a fan of flows leaves a symbol as a fan rather
+than as one line drawn several times, and a pathway arriving from above is not
+sent round to a port below.
 \end{itemize}
 
 Neither is something to arrange by hand: \verb|\renderEnergese| and the
@@ -910,7 +944,8 @@ It is traced: every position in it was measured from his figure, reproduced
 below beside it, so the composition is his rather than the layout engine's. It
 exercises a system window, notched consumers, four exchanges --- one of them
 the human service fed back to industry over the top of the whole system --- the
-Sun's unused-energy hooks, quantities on pathways, and the heat-sink total.
+Sun's unused-energy hooks, bundled exchanges fanning into Industry's notch,
+quantities on pathways, and the heat-sink total.
 
 \begin{center}
 \includegraphics[width=0.75\textwidth]{reference-images/aggregated-economy.png}\par

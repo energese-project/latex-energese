@@ -191,6 +191,27 @@ Status: **WIP**. Before `be1a514`, money left from the symbol's upper half on it
 own arc. A transaction used as an end point, like "Market" in the guide, is not
 an exchange and should not be in the examples at all. · [x] Approve · Your call:
 
+### C22 — Pathways sharing a route run as a bundle and fan into the notch
+Where several pathways share a route, Odum draws them side by side as one
+bundle: the human-service loop over the top, and the exchange pairs in the
+corridor between Agriculture and Industry. At each end the bundle fans out,
+each pathway meeting the symbol at its own point with its own arrowhead.
+Measured from aggregated-economy.png (about ±0.2 mm): exchange pairs run
+3.2 mm apart, solid line to solid line; plain pathways, such as the arrows into
+Industry's notch, 1.8 mm.
+
+![](conventions/C22-bundle-fan.png)
+
+Status: **OK** (`bundle` on edges and exchanges) · [x] Approve · Your call:
+
+### C23 — Each exchange carries its own diamond, along its route
+An exchange's diamond sits along the run of its tracks, not at the first bend,
+and within a bundle the diamonds are staggered so that no two sit side by side.
+
+![](conventions/C23-diamonds-on-loop.png)
+
+Status: **OK** (`diamond_at` places one by hand) · [x] Approve · Your call:
+
 ---
 
 ## F. Labels and annotation

@@ -142,6 +142,8 @@
 \newcount\energese@portJ
 \newcount\energese@portI
 \newcount\energese@portM
+\newcount\energese@portH
+\newcount\energese@portW
 \newif\ifenergese@portfound
 \newdimen\energese@portax \newdimen\energese@portay
 \newdimen\energese@portcx \newdimen\energese@portcy
@@ -228,6 +230,11 @@
         {(sin(\energese@portangt - \energese@portanga) < 0) ? -1 : 1}%
     \energese@portN=\energese@portNv\relax
     \energese@portS=\energese@portSv\relax
+    % Whether the other end lies to one side at all: within about 10 degrees
+    % of the anchor's direction it does not, and the search alternates.
+    \pgfmathtruncatemacro{\energese@portWv}%
+        {(abs(sin(\energese@portangt - \energese@portanga)) > 0.17) ? 1 : 0}%
+    \energese@portW=\energese@portWv\relax
     \energese@portD=\energese@portDv\relax
     \energese@portwrap\energese@portD
     \energese@portJ=0
@@ -248,15 +255,33 @@
 
 \def\energese@porttry#1{%
     \ifnum\energese@portJ<\energese@portN
-        % Offsets 0, +s, -s, +2s, -2s, ...: the desired port first, then
-        % outward, starting on the side the pathway comes from.
+        % A pathway whose other end lies to one side: offsets 0, +s, +2s, ...
+        % up to half the ring, then -s, -2s, ... -- outward on the side it
+        % comes from, and only then the other. Alternating, as this once did
+        % for every pathway, sent one arriving from above to the first free
+        % port below once the ports round the anchor were taken, across every
+        % pathway between. A pathway with no side to come from -- running
+        % along the anchor's own direction -- still alternates, 0, +s, -s,
+        % +2s, ..., to the nearest free port either way; kept to one side it
+        % was sent past every pathway already on that side.
         \energese@portM=\energese@portJ
-        \advance\energese@portM by 1
-        \divide\energese@portM by 2
-        \ifodd\energese@portJ
-            \multiply\energese@portM by \energese@portS
+        \ifnum\energese@portW=1
+            \energese@portH=\energese@portN
+            \divide\energese@portH by 2
+            \ifnum\energese@portJ>\energese@portH
+                \advance\energese@portM by -\energese@portH
+                \multiply\energese@portM by -\energese@portS
+            \else
+                \multiply\energese@portM by \energese@portS
+            \fi
         \else
-            \multiply\energese@portM by -\energese@portS
+            \advance\energese@portM by 1
+            \divide\energese@portM by 2
+            \ifodd\energese@portJ
+                \multiply\energese@portM by \energese@portS
+            \else
+                \multiply\energese@portM by -\energese@portS
+            \fi
         \fi
         \energese@portI=\energese@portD
         \advance\energese@portI by \energese@portM

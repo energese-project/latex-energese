@@ -425,8 +425,10 @@ function energese.expand_exchanges(data)
             added[#added + 1] = {
                 from = node.seller, to = node.buyer,
                 type = falls and "feedback" or "energy",
-                from_anchor = "energy_out", to_anchor = "energy_in",
-                waypoints = node.waypoints,
+                from_anchor = node.from_anchor or "energy_out",
+                to_anchor = node.to_anchor or "energy_in",
+                waypoints = node.waypoints, bundle = node.bundle,
+                marker_pos = node.diamond_at,
                 label = node.energy_label, label_options = node.energy_label_options,
                 options = node.options or "bend left=8",
                 exchange = node.id, exchange_leg = "goods",
@@ -1988,13 +1990,33 @@ function energese.curve_is_clear(pts, boxes, pad, out_first, in_last)
     return true
 end
 
-function energese.smooth_path(pts, label_code, out_first, in_last)
+-- Which segment of a polyline holds the point a fraction of the way along its
+-- whole length, and how far along that segment it is.
+function energese.polyline_at(pts, fraction)
+    local lengths, total = {}, 0
+    for i = 1, #pts - 1 do
+        local l = math.sqrt((pts[i + 1][1] - pts[i][1]) ^ 2 + (pts[i + 1][2] - pts[i][2]) ^ 2)
+        lengths[i], total = l, total + l
+    end
+    local want = fraction * total
+    for i = 1, #pts - 1 do
+        if want <= lengths[i] or i == #pts - 1 then
+            return i, (lengths[i] > 0) and math.min(1, want / lengths[i]) or 0.5
+        end
+        want = want - lengths[i]
+    end
+    return 1, 0.5
+end
+
+function energese.smooth_path(pts, label_code, out_first, in_last, marker)
     local angles = path_tangents(pts, out_first, in_last)
     local parts = {}
     for i = 1, #pts - 1 do
         -- The label rides the first segment; `midway' on a multi-segment path
-        -- would otherwise attach to the last one.
+        -- would otherwise attach to the last one. An exchange's diamond rides
+        -- whichever segment holds its place along the whole route (marker).
         local node = (i == 1) and label_code or ""
+        if marker and marker.seg == i then node = node .. " " .. marker.code end
         parts[#parts + 1] = string.format("to [out=%.1f, in=%.1f] %s (%.4f, %.4f)",
             angles[i][1], angles[i][2], node, pts[i + 1][1], pts[i + 1][2])
     end
@@ -2369,7 +2391,15 @@ end
 -- The mean is circular -- summed as unit vectors -- because a fan straddling
 -- due east has bearings near both 0 and 360, and an arithmetic mean of those
 -- points due west.
-function energese.port_requests(edges, node_map, x_coords, y_coords)
+-- The direction each named anchor faces, for working out which way round the
+-- ring the allocator will step from it (energese.sty).
+local ANCHOR_ANGLE = {
+    energy_in = 180, energy_out = 0, west = 180, east = 0, north = 90,
+    south = -90, feedback_in = 90, feedback_out = 90, heat_sink = -90,
+    money_in = 30, money_out = 150,
+}
+
+function energese.port_requests(edges, node_map, x_coords, y_coords, bundles)
     local groups, order = {}, {}
     for i, edge in ipairs(edges) do
         local from_anchor, to_anchor = energese.edge_anchors(edge, node_map)
@@ -2384,6 +2414,55 @@ function energese.port_requests(edges, node_map, x_coords, y_coords)
             local dy = (y_coords[req.other] or 0) - (y_coords[req.node] or 0)
             req.bearing = math.deg(math.atan(dy, dx))
             req.seq = i
+            -- A bundle's members meet a symbol at neighbouring ports, and each
+            -- must get the port on its own track's side or the tracks cross
+            -- there. The allocator grants the anchor's port first, then steps
+            -- outward from it (see below), and the members ask in the order
+            -- that hands each the port on its own side.
+            -- Leaving a symbol, the left of travel is anticlockwise of the
+            -- anchor; arriving, it is clockwise.
+            local b = bundles and edge.bundle and bundles[edge.bundle]
+            if b and b.index[i] and ANCHOR_ANGLE[req.anchor] then
+                local a = ANCHOR_ANGLE[req.anchor]
+                local S = (math.sin(math.rad(req.bearing - a)) < 0) and -1 or 1
+                -- Which way the pathway travels at this end: towards its first
+                -- waypoint leaving, from its last arriving (the far node if it
+                -- has none). A step anticlockwise round the ring moves left of
+                -- travel when cos(anchor - travel) > 0: leaving along the
+                -- anchor it does, arriving head-on it does not, and arriving
+                -- from above onto a side-facing notch it depends which way the
+                -- pathway is leaning.
+                local wps = edge.waypoints and energese.parse_waypoints(edge.waypoints) or {}
+                local leaving = req.key:sub(-1) == "f"
+                local here = { x_coords[req.node] or 0, y_coords[req.node] or 0 }
+                local near = leaving and wps[1] or wps[#wps]
+                    or { x_coords[req.other] or 0, y_coords[req.other] or 0 }
+                local tx, ty = near[1] - here[1], near[2] - here[2]
+                if not leaving then tx, ty = -tx, -ty end
+                local travel = math.deg(math.atan(ty, tx))
+                -- +1 if a step of S round the ring moves left of travel.
+                local towards = S * ((math.cos(math.rad(a - travel)) >= 0) and 1 or -1)
+                -- The ports in the order granted, in steps of S, as
+                -- energese.sty grants them: 0, 1, 2, ... for a pathway whose
+                -- other end lies to one side; 0, 1, -1, 2, ... for one running
+                -- within about 10 degrees of the anchor's direction.
+                local one_sided = math.abs(math.sin(math.rad(req.bearing - a))) > 0.17
+                local steps = {}
+                for k = 1, b.count do
+                    if one_sided then
+                        steps[k] = k - 1
+                    else
+                        steps[k] = (k % 2 == 0) and (k / 2) or (-(k - 1) / 2)
+                    end
+                end
+                -- Ranked right to left across the track, as members are.
+                local by_side = {}
+                for k = 1, b.count do by_side[k] = k end
+                table.sort(by_side, function(p, q)
+                    return steps[p] * towards < steps[q] * towards end)
+                req.seq = b.members[1] + by_side[b.side[i]] / 100
+                req.bundle = edge.bundle
+            end
             -- One group per contested anchor: only pathways asking for the
             -- same anchor of the same symbol are competing for a port.
             local group = req.node .. "\0" .. req.anchor
@@ -2412,6 +2491,8 @@ function energese.port_requests(edges, node_map, x_coords, y_coords)
             req.spread = math.abs((req.bearing - mean + 180) % 360 - 180)
         end
         table.sort(g, function(a, b)
+            -- A bundle's members ask in the order worked out above.
+            if a.bundle and a.bundle == b.bundle then return a.seq < b.seq end
             if math.abs(a.spread - b.spread) > 1e-9 then return a.spread < b.spread end
             if a.other ~= b.other then return a.other < b.other end
             return a.seq < b.seq
@@ -2768,12 +2849,66 @@ function energese.render(data, options)
         end
     end
 
+    -- Bundles: pathways named into one `bundle` share a route and are drawn
+    -- as parallel tracks (C22). Measured from aggregated-economy.png, good to
+    -- about 0.2 mm: exchange pairs run 3.2 mm apart, solid line to solid line,
+    -- and plain pathways 1.8 mm -- the arrows into Industry's notch. A
+    -- member's track is ranked across the bundle by where its sender sits,
+    -- to the left of the shared direction of travel or to the right, so two
+    -- members coming from different places do not cross on the way in.
+    local bundles = {}
+    for edge_index, edge in ipairs(data.edges) do
+        if edge.bundle and edge.exchange_leg ~= "money" then
+            local b = bundles[edge.bundle] or { members = {}, index = {}, pitch = 0.18 }
+            table.insert(b.members, edge_index)
+            if edge.exchange_leg then b.pitch = 0.32 end
+            bundles[edge.bundle] = b
+        end
+    end
+    for _, b in pairs(bundles) do
+        -- The bundle's direction is its first member's; a member running the
+        -- other way (an exchange back along the same corridor) counts its
+        -- side against that, not against its own travel, or two members
+        -- running opposite ways would land on the same line.
+        local first = data.edges[b.members[1]]
+        local tx = (x_coords[first.to] or 0) - (x_coords[first.from] or 0)
+        local ty = (y_coords[first.to] or 0) - (y_coords[first.from] or 0)
+        b.reversed = {}
+        for _, i in ipairs(b.members) do
+            local e = data.edges[i]
+            local dx = (x_coords[e.to] or 0) - (x_coords[e.from] or 0)
+            local dy = (y_coords[e.to] or 0) - (y_coords[e.from] or 0)
+            b.reversed[i] = (dx * tx + dy * ty) < 0
+        end
+        local key = {}
+        for k, i in ipairs(b.members) do
+            local e = data.edges[i]
+            -- Leftness across the bundle's direction of the member's middle
+            -- -- its sender for members converging on one symbol, and the
+            -- same for members either way between the same two -- with
+            -- declaration order breaking ties.
+            local mx = ((x_coords[e.from] or 0) + (x_coords[e.to] or 0)) / 2
+            local my = ((y_coords[e.from] or 0) + (y_coords[e.to] or 0)) / 2
+            key[i] = (mx * -ty + my * tx) * 1000 - k
+        end
+        table.sort(b.members, function(p, q) return key[p] < key[q] end)
+        b.count = #b.members
+        -- index: rank right to left across the bundle in its own direction;
+        -- side: the same rank counted in the member's own direction of travel,
+        -- which is what its offset and its ports are reckoned in.
+        b.side = {}
+        for rank, i in ipairs(b.members) do
+            b.index[i] = rank
+            b.side[i] = b.reversed[i] and (b.count + 1 - rank) or rank
+        end
+    end
+
     -- Then every pathway's ports, granted in geometric order and stashed under
     -- the edge's key. Claiming them all here rather than as each pathway is
     -- drawn is what keeps the result independent of the order the model lists
     -- its edges in.
     for _, req in ipairs(energese.port_requests(data.edges, node_map,
-                                                x_coords, y_coords)) do
+                                                x_coords, y_coords, bundles)) do
         tex.print(string.format(
             "\\energeseport{%s}{%s}{%s}\\energesekeepport{%s}",
             req.node, req.anchor, req.other, req.key))
@@ -2805,6 +2940,26 @@ function energese.render(data, options)
         if edge.waypoints then
             -- Model-supplied geometry wins: reproduce what was drawn.
             waypoints = energese.parse_waypoints(edge.waypoints)
+            local b = edge.bundle and bundles[edge.bundle]
+            if b and #waypoints > 0 then
+                -- A bundle's members run side by side along the shared route,
+                -- each `b.pitch` from the next, to the left of travel for the
+                -- later ones; at the ends each meets its own port, so the
+                -- bundle fans out into the symbol.
+                local shift = (b.side[edge_index] - (b.count + 1) / 2) * b.pitch
+                local route = { { x_coords[from], y_coords[from] } }
+                for _, w in ipairs(waypoints) do route[#route + 1] = w end
+                route[#route + 1] = { x_coords[to], y_coords[to] }
+                local moved = {}
+                for k = 2, #route - 1 do
+                    local tx = route[k + 1][1] - route[k - 1][1]
+                    local ty = route[k + 1][2] - route[k - 1][2]
+                    local len = math.max(math.sqrt(tx * tx + ty * ty), 1e-9)
+                    moved[#moved + 1] = { route[k][1] - ty / len * shift,
+                                          route[k][2] + tx / len * shift }
+                end
+                waypoints = moved
+            end
         elseif options:match("bend") and x_coords[from] and x_coords[to] then
             -- Author-bent: keep the direction of curvature, open the angle
             -- until it clears, and only route automatically if none does.
@@ -2966,12 +3121,32 @@ function energese.render(data, options)
         -- pathway runs visibly through it. It sits halfway towards the money
         -- track, between the two, so that both run through the diamond --
         -- goods through one half, money the other -- as on Odum's sheet.
-        local marker_code = ""
+        -- Where along the route: halfway by default, `diamond_at` on the
+        -- exchange to follow a figure, and staggered within a bundle so no
+        -- two diamonds sit side by side across the tracks (C23).
+        local marker_code, marker_at = "", nil
         if edge.marker then
-            marker_code = string.format(
-                "node[energese %s, energese magnitude=%f, pos=0.5, sloped, "
+            local frac = tonumber(edge.marker_pos) or 0.5
+            local b = edge.bundle and bundles[edge.bundle]
+            if b and not edge.marker_pos then
+                frac = 0.5 + (b.index[edge_index] - (b.count + 1) / 2) * 0.12
+            end
+            local seg, t = 1, frac
+            if #waypoints > 0 then
+                local route = { { x_coords[from], y_coords[from] } }
+                for _, w in ipairs(waypoints) do route[#route + 1] = w end
+                route[#route + 1] = { x_coords[to], y_coords[to] }
+                seg, t = energese.polyline_at(route, frac)
+            end
+            local code = string.format(
+                "node[energese %s, energese magnitude=%f, pos=%.3f, sloped, "
                 .. "yshift=%.3fcm, fill=none, inner sep=0pt] {}",
-                edge.marker, edge.marker_magnitude or 1.0, EXCHANGE_GAP / 2)
+                edge.marker, edge.marker_magnitude or 1.0, t, EXCHANGE_GAP / 2)
+            if #waypoints > 0 then
+                marker_at = { seg = seg, code = code }
+            else
+                marker_code = code
+            end
         end
 
         -- The unused part of a renewable inflow (C04): where the pathway
@@ -3044,19 +3219,28 @@ function energese.render(data, options)
         -- rather than being drawn on top of this one.
         if edge.exchange_leg == "money" and goods_index[edge.exchange] then
             -- Beside the goods' ports, EXCHANGE_GAP to the left of their
-            -- travel: at the buyer, the chord to the seller turned clockwise;
-            -- at the seller, the chord to the buyer turned anticlockwise.
+            -- travel there: at the buyer, the way the goods arrive from turned
+            -- clockwise; at the seller, the way they leave turned
+            -- anticlockwise. The way is the far port for a pathway with no
+            -- waypoints, and the nearest waypoint for one routed through them
+            -- -- which leaves its symbol heading for that, not for the far end,
+            -- and the chord put the money's end on the wrong side.
             local gi = goods_index[edge.exchange]
+            local gw = geom[gi].waypoints
+            local toward_buyer = (#gw > 0) and string.format("(%.4f, %.4f)", gw[1][1], gw[1][2])
+                                 or "(energese-buyer)"
+            local toward_seller = (#gw > 0) and string.format("(%.4f, %.4f)", gw[#gw][1], gw[#gw][2])
+                                  or "(energese-seller)"
             tex.print(string.format(
                 "\\energeserecallport{e%df}\\coordinate (energese-seller) at (\\energeseportname);"
                 .. "\\energeserecallport{e%dt}\\coordinate (energese-buyer) at (\\energeseportname);"
                 .. "\\coordinate (energese-money-from) at "
-                .. "($(energese-buyer)!%.3fcm!-90:(energese-seller)$);"
+                .. "($(energese-buyer)!%.3fcm!-90:%s$);"
                 .. "\\coordinate (energese-money-to) at "
-                .. "($(energese-seller)!%.3fcm!90:(energese-buyer)$);"
+                .. "($(energese-seller)!%.3fcm!90:%s$);"
                 .. "\\def\\energesefromport{energese-money-from}"
                 .. "\\def\\energesetoport{energese-money-to}",
-                gi, gi, EXCHANGE_GAP, EXCHANGE_GAP))
+                gi, gi, EXCHANGE_GAP, toward_seller, EXCHANGE_GAP, toward_buyer))
         else
             tex.print(string.format(
                 "\\energeserecallport{e%df}\\let\\energesefromport\\energeseportname"
@@ -3070,7 +3254,7 @@ function energese.render(data, options)
             pts[#pts + 1] = { x_coords[to], y_coords[to] }
             tex.print(string.format("\\draw[%s] (\\energesefromport) %s;",
                 style,
-                energese.smooth_path(pts, label_code):gsub(
+                energese.smooth_path(pts, label_code, nil, nil, marker_at):gsub(
                     "%(%-?[%d.]+, %-?[%d.]+%)$", "(\\energesetoport)")))
         else
             -- A dead straight pathway reads as mechanical next to Odum's

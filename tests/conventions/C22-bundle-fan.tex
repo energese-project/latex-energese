@@ -1,0 +1,21 @@
+% C22: pathways sharing a route run as parallel tracks and fan into the notch, each with its own arrowhead and diamond.
+% docs/odum-conventions.md; reference crop in docs/conventions/.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{row_spacing=1.2, show_heat_sink=false}
+    \esnode{fuel}{source}     {Tr=1000, x=4.4, y=4.6, label={Fuels}}
+    \esnode{ore}{source}      {Tr=1000, x=6.0, y=4.6, label={Ores}}
+    \esnode{agri}{producer}   {Tr=10,   x=0.0, y=0.0, label={Agriculture}}
+    \esnode{ind}{consumer}    {Tr=2000, x=4.6, y=2.4, magnitude=1.3, notched, label={Industry}}
+    \esnode{a}{transaction}{seller=agri, buyer=ind, bundle=corridor, from_anchor=north, money_label={\$},
+                            waypoints={0.6,1.2; 2.2,2.4}}
+    \esnode{b}{transaction}{seller=agri, buyer=ind, bundle=corridor, from_anchor=north, money_label={\$},
+                            waypoints={0.6,1.2; 2.2,2.4}}
+    \esnode{c}{transaction}{seller=agri, buyer=ind, bundle=corridor, from_anchor=north, money_label={\$},
+                            waypoints={0.6,1.2; 2.2,2.4}}
+    \esflow{fuel}{ind}{energy}{bundle=top, waypoints={4.4,3.6}}
+    \esflow{ore}{ind}{energy} {bundle=top, waypoints={4.4,3.6}}
+\end{energese}
+\end{document}
