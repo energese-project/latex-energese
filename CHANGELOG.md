@@ -19,6 +19,13 @@ fixture in `tests/conventions/`. Rendered output changes throughout.
 
 ### Added
 
+- `bundle` on edges and exchanges: pathways sharing a route run side by side,
+  3.2 mm apart for exchange pairs and 1.8 mm for plain pathways, and fan out
+  into their own points at each end (C22).
+- `diamond_at`, `from_anchor` and `to_anchor` on exchanges.
+- aggregated-economy traces Odum's bundles: the human-service loop feeding
+  Industry and Agriculture, and the exchange corridor between Agriculture and
+  Industry.
 - `misc`: Odum's miscellaneous box. `feedback`: a pathway from a
   higher-quality component back to a lower one, arcing over into its top.
 - `unused` on an edge: the unused part of a renewable inflow hooking back out
@@ -55,6 +62,10 @@ at their real size.
 
 ### Fixed
 
+- An exchange routed through waypoints had its diamond on the first segment;
+  it now sits along the route (C23).
+- The port allocator alternated sides when ports were busy, sending a pathway
+  arriving from above to a port below; it now keeps to the approaching side.
 - **`scale` no longer overlaps the symbols.** TikZ's `scale` moved the
   coordinates but drew the symbols at full size, so a scaled diagram packed
   full-size symbols into a shrunken layout; the user guide's figures, at 0.75
